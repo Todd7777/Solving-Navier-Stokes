@@ -1,0 +1,61 @@
+# audit/scan_lean_repo.sh run on 2026-11-05 against openai/NavierStokesAndEuler @ f9e8bc5b38b6e212696e8a30e3e91517af887bbd
+
+pattern                                          hits
+\bsorry\b                                           5
+\bsorryAx\b                                         0
+^\s*axiom\b                                         0
+\bunsafe\b                                          0
+native_decide                                       0
+implemented_by                                      0
+@\[extern                                           0
+^\s*opaque\b                                        0
+^\s*partial\b                                       0
+set_option                                          0
+ofReduceBool                                        0
+\badmit\b                                           0
+decide\s*:=\s*true                                  0
+run_cmd                                             0
+run_tac                                             0
+#eval                                               0
+\binitialize\b                                      3
+macro_rules                                         0
+\belab\b                                            0
+Classical\.choice                                 156
+propext                                             5
+Quot\.sound                                         4
+local\s+instance                                 1542
+
+--- every 'sorry' with context (expected: only the intentional challenge placeholders) ---
+ComparatorChallenges/Euler.lean:88:  sorry
+ComparatorChallenges/Euler.lean:184:  sorry
+ComparatorChallenges/NavierStokes.lean:29:are retained, including their intentional `sorry` challenge placeholders. The
+ComparatorChallenges/NavierStokes.lean:277:  sorry
+ComparatorChallenges/NavierStokes.lean:284:  sorry
+
+--- every 'axiom' declaration (expected: none) ---
+(none)
+
+--- every 'set_option' (expected: none) ---
+(none)
+
+--- imports outside Mathlib and the project (expected: none) ---
+(none)
+
+--- sizes ---
+NavierStokes: 816 files, 429279 lines, 26200 theorem/lemma, 7497 def
+Euler: 1839 files, 211578 lines, 10632 theorem/lemma, 3287 def
+ComparatorChallenges: 2 files, 472 lines, 9 theorem/lemma, 7 def
+
+--- pinned toolchain and dependencies ---
+leanprover/lean4:v4.34.0-rc2
+Comparator       19e111e2141cf333c7daff0f64c5f24acc91dd2e  (https://github.com/leanprover/comparator.git)
+mathlib          85e3a25e006c35636f0e53b0e9296caca2685bc0  (https://github.com/leanprover-community/mathlib4.git)
+lean4export      cacf989bd75f608700820f6afc595f32e7a99a4d  (https://github.com/leanprover/lean4export)
+plausible        d9598f07b1bc701f1e3aae163d2681c1fd978793  (https://github.com/leanprover-community/plausible)
+LeanSearchClient ba67e212be1197b84c1f1f6299488a10a3002713  (https://github.com/leanprover-community/LeanSearchClient)
+importGraph      d8823026ac7ef130c253089d95685f9877b95323  (https://github.com/leanprover-community/import-graph)
+proofwidgets     a8acbfd87375ff4abe14ce09db5b7664d383bc7f  (https://github.com/leanprover-community/ProofWidgets4)
+aesop            18889deb9e83ea7420ef51c160d6f88552e744e3  (https://github.com/leanprover-community/aesop)
+Qq               507746ab8f4b643ccdacb2ec4cdb5853fa9f8ab3  (https://github.com/leanprover-community/quote4)
+batteries        d54dddc581e08be364c278052863524bff7a99a9  (https://github.com/leanprover-community/batteries)
+Cli              ab3a82db9fea14cf0fd7f5a2de650f4b534640af  (https://github.com/leanprover/lean4-cli)

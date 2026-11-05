@@ -1,0 +1,4 @@
+# git metadata of the audited clone (2026-11-05)
+commit f9e8bc5b38b6e212696e8a30e3e91517af887bbd
+author Boris Alexeev
+date 2026-09-10 07:51:24 -0400

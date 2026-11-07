@@ -1,0 +1,4 @@
+import NavierStokes.ComparatorSolution
+
+#print axioms NavierStokes.Comparator.navier_stokes_breakdown_R3
+#print axioms NavierStokes.Comparator.navier_stokes_breakdown_periodic

@@ -24,7 +24,8 @@
 #   NS_REPO=/path    this repository's checkout (default: the directory sbatch was run from)
 #   KC_TMPDIR=/path  parent of the job's temporary directory (default: node-local /scratch, else
 #                    $WORK/tmp). Comparator writes the solution's export there for nanoda.
-#   USE_MATHLIB_CACHE, SANDBOX, NANODA, LEAN_NUM_THREADS, LEANCHECKER_THREADS: see kernel_check.sh.
+#   USE_MATHLIB_CACHE, SANDBOX, NANODA, LEAN_NUM_THREADS, LEANCHECKER_THREADS, RESUME_CHECK:
+#                    see kernel_check.sh.
 # Optional tools are found on the PATH you submit with: cargo for the nanoda second kernel, Go for
 # landrun (which also needs Landlock, Linux >= 5.13; Cannon's compute nodes run 4.18).
 set -euo pipefail
@@ -100,9 +101,9 @@ rev=$(git -C "$kc_dir" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 if [ -n "$(git -C "$kc_dir" status --porcelain --untracked-files=no -- . 2>/dev/null)" ]; then
   rev="$rev with local changes to audit/kernel-check"
 fi
-printf '%s start %-5s job %s on %s (partition %s): %s CPUs, %s MB, LEAN_NUM_THREADS=%s, LEANCHECKER_THREADS=%s, repository %s\n' \
+printf '%s start %-5s job %s on %s (partition %s): %s CPUs, %s MB, LEAN_NUM_THREADS=%s, LEANCHECKER_THREADS=%s, RESUME_CHECK=%s, repository %s\n' \
   "$(date -u +%FT%TZ)" "$stage" "${SLURM_JOB_ID:-none}" "$(hostname)" "${SLURM_JOB_PARTITION:-none}" \
-  "$cpus" "$mem_mb" "$LEAN_NUM_THREADS" "$LEANCHECKER_THREADS" "$rev" | tee -a "$jobs_log"
+  "$cpus" "$mem_mb" "$LEAN_NUM_THREADS" "$LEANCHECKER_THREADS" "${RESUME_CHECK:-0}" "$rev" | tee -a "$jobs_log"
 # shellcheck disable=SC2329  # called by the EXIT trap
 finish() {
   local rc=$?

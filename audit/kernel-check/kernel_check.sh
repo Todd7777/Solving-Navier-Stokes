@@ -29,6 +29,8 @@
 #   LEANCHECKER_THREADS=n modules replayed at once by `leanchecker NavierStokes Euler`. Each
 #                         replay reads its own copy of the .olean files it imports (most of
 #                         Mathlib), so memory is the limit. Default min(CPUs, GB of RAM / 12).
+#   RESUME_CHECK=1        continue an interrupted or partly failed check: steps already recorded
+#                         as PASS are kept and skipped; everything else runs again. Default 0.
 set -euo pipefail
 
 # ---------------------------------------------------------------- pinned inputs
@@ -66,6 +68,7 @@ SANDBOX=${SANDBOX:-auto}
 NANODA=${NANODA:-auto}
 LEAN_ZIP_PATH=${LEAN_ZIP_PATH:-}
 LEANCHECKER_THREADS=${LEANCHECKER_THREADS:-}
+RESUME_CHECK=${RESUME_CHECK:-0}
 PROJ=$WORK/NavierStokesAndEuler
 TOOLS=$WORK/tools
 LEANBIN=$TOOLS/lean-${LEAN_VERSION}-linux/bin
@@ -78,17 +81,34 @@ log()    { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$LOG" >&2; }
 # SUMMARY.txt is assembled from one file per stage, so re-running a stage replaces its lines.
 summarize() { cat "$RESULTS"/summary/{fetch,build,check}.txt >"$RESULTS/SUMMARY.txt" 2>/dev/null || true; }
 record() { printf '%-58s %s\n' "$1" "$2" | tee -a "$RESULTS/summary/$STAGE.txt" >&2; summarize; }
+record_once() { # record, unless this exact line is already there (a resumed check)
+  grep -Fxq -- "$(printf '%-58s %s' "$1" "$2")" "$RESULTS/summary/$STAGE.txt" 2>/dev/null || record "$1" "$2"
+}
 die()    { log "FATAL: $*"; record "FATAL" "$*"; exit 1; }
-begin()  { # begin <stage>: start (or restart) a stage on this machine
+resuming() { [ "$STAGE" = check ] && [ "$RESUME_CHECK" = 1 ]; }
+passed_before() { # passed_before <label>: this resumed check already recorded <label> as PASS
+  resuming || return 1
+  awk -v l="$1" 'index($0, l " ") == 1 { s = substr($0, length(l) + 2); sub(/^ +/, "", s); if (s ~ /^PASS/) f = 1 }
+                 END { exit !f }' "$RESULTS/summary/$STAGE.txt"
+}
+begin()  { # begin <stage>: start a stage on this machine (a resumed check keeps what passed)
   STAGE=$1
-  : >"$RESULTS/summary/$STAGE.txt"
+  local part=$RESULTS/summary/$STAGE.txt
+  if resuming && [ -f "$part" ]; then
+    grep -vE '^(OVERALL|FATAL) |(^| )FAIL( |$)' "$part" >"$part.kept" || true
+    mv "$part.kept" "$part"
+  else
+    : >"$part"
+    : >"$RESULTS/machine-$STAGE.txt"
+  fi
   summarize
   { echo "host $(hostname)  cpus $(nproc)  mem $(free -g | awk '/Mem:/{print $2}')G  kernel $(uname -r)  Landlock $(landlock_active && echo yes || echo no)"
-    date -u; } >"$RESULTS/machine-$STAGE.txt"
-  log "stage $STAGE on $(hostname)"
+    date -u; } >>"$RESULTS/machine-$STAGE.txt"
+  log "stage $STAGE on $(hostname)$(resuming && echo ', resuming: steps that passed are kept')"
 }
 timed()  { # timed <label> <logfile> <cmd...> : run, log output, record PASS/FAIL and seconds
   local label=$1 out=$2; shift 2
+  if passed_before "$label"; then log "kept from an earlier run: $label"; return 0; fi
   local t0=$SECONDS rc=0
   log "start: $label"
   "$@" >"$out" 2>&1 || rc=$?
@@ -244,7 +264,8 @@ PY
 }
 
 check_axioms() {
-  local f out rc=0
+  local f out rc=0 label="main theorems use only propext/choice/Quot.sound"
+  if passed_before "$label"; then log "kept from an earlier run: $label"; return 0; fi
   for f in PrintAxiomsNavierStokes PrintAxiomsEuler; do
     out=$RESULTS/$f.txt
     timed "#print axioms ($f)" "$out" lake env lean "$HERE/$f.lean" || rc=1
@@ -262,7 +283,7 @@ for thm in sys.argv[2].split():
     print(("PASS " if good else "FAIL ") + thm + " axioms=" + (", ".join(sorted(got)) if got else "NOT FOUND"))
 sys.exit(0 if ok else 1)
 PY
-  [ $rc -eq 0 ] && record "main theorems use only propext/choice/Quot.sound" "PASS" || record "main theorems use only propext/choice/Quot.sound" "FAIL"
+  if [ $rc -eq 0 ]; then record "$label" "PASS"; else record "$label" "FAIL"; fi
 }
 
 static_scan() {
@@ -274,7 +295,7 @@ static_scan() {
     printf '%-24s %6d\n' "$pat" "$n" >>"$out"
   done
   # In the solution trees only docstring mentions are expected; any code-level hit must be inspected.
-  record "static scan of NavierStokes/ and Euler/" "written (inspect static-scan.txt)"
+  record_once "static scan of NavierStokes/ and Euler/" "written (inspect static-scan.txt)"
 }
 
 leanchecker_threads() { # min(CPUs, GB of RAM / 12), at least 1
@@ -288,7 +309,7 @@ check() {
   lean_env
   [ -f "$TOOLS/LANDRUN" ] || die "run '$0 build' first"
   # The check may run on a different machine from the build: record the sandbox where Comparator runs.
-  record "sandbox on this machine" "$(basename "$(cat "$TOOLS/LANDRUN")"); Landlock active: $(landlock_active && echo yes || echo no)"
+  record_once "sandbox on this machine" "$(basename "$(cat "$TOOLS/LANDRUN")"); Landlock active: $(landlock_active && echo yes || echo no)"
   comparator_run NavierStokes ComparatorChallenges/NavierStokes.json || true
   comparator_run Euler ComparatorChallenges/Euler.json || true
   check_axioms || true

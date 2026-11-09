@@ -24,14 +24,19 @@ Unforced global regularity, statements (A) and (B), is open, and this repository
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-pytest -q          # 2026-11-08: 7 pass
+python -m pytest -q   # 2026-11-09: 15 pass
 ```
 
-## State on 2026-11-08
+In the cloud environment `pytest` on PATH can be a uv tool without numpy or sympy, which fails at collection;
+`python -m pytest` runs in the interpreter the requirements went into.
+
+## State on 2026-11-09
 
 - `audit/kernel-check/kernel_check.sh` rebuilds OpenAI's proof and runs the kernel checks. It is Linux-only and
   compiles Mathlib from source by default, which takes hours. A cloud session (about 4 CPUs and 16 GB of RAM)
-  is the wrong place for it. Run it on a cluster.
+  is the wrong place for it. Run it on a cluster: `audit/kernel-check/submit_fasrc.sh` submits fetch, build and
+  check as three chained SLURM jobs on FASRC Cannon (`audit/kernel-check/README.md`).
+- The fetch stage passed in a cloud session on 2026-11-09, with no host blocked. Build and check have not been run.
 - The audit itself could not rebuild the proof. `docs/03-audit-openai-lean-formalization.md`, Section 7, says
   what was and was not checked and gives the exact rebuild commands.
 

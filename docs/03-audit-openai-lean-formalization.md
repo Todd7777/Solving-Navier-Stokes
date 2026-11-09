@@ -219,6 +219,15 @@ A successful run of the second block is the strongest available evidence for (C)
 Anyone who runs it should also diff `ComparatorChallenges/NavierStokes.lean` against the frozen copy here before
 trusting it: the challenge file is the trusted base.
 
+*Update, 9 November 2026.* `audit/kernel-check/` now automates all of the above from pinned inputs, with Mathlib built
+from source, and adds `#print axioms` and `leanchecker`. Its README explains how to run it as three SLURM jobs on
+Harvard's FASRC Cannon cluster. The pinned Lean release is also published on GitHub, which cloud sessions can reach:
+the job's fetch stage, which downloads every input and checks it against the hashes frozen here, passed on 7 November
+(as recorded in that README) and again on 9 November 2026. On 9 November the challenge statement and the DeepMind
+reference it fetched were byte-identical to the frozen copies, and their diff matched the one behind Section 4. The
+build and check stages have not been run for this audit yet, so the verdict above is unchanged: the kernel check
+still rests on OpenAI's own report and on whoever has run it since.
+
 ## 8. The "lost in translation" critique, read carefully
 
 Bastounis, Circelli and Hansen (arXiv:2610.08144, 6 Oct 2026) compare the manuscript with the Lean development and

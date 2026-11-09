@@ -9,7 +9,8 @@ wrote it (see "Why this was not run here" below).
 | file | purpose |
 |---|---|
 | `kernel_check.sh` | portable driver: `fetch`, `build`, `check`, or `all` |
-| `fasrc.sbatch` | SLURM wrapper for Harvard FASRC (Cannon) |
+| `fasrc.sbatch` | runs one stage as a SLURM job on Harvard FASRC (Cannon) |
+| `submit_fasrc.sh` | submits fetch, build and check as three chained SLURM jobs |
 | `PrintAxiomsNavierStokes.lean`, `PrintAxiomsEuler.lean` | `#print axioms` for the four main theorems |
 
 ## What the job checks
@@ -47,7 +48,12 @@ Comparator runs. Only Mathlib and the checking tools are built first.
   `initialize`, `#eval`, `run_cmd`), so compiling it runs only Mathlib's and Lean's own tactics.
 
 Mathlib is compiled from source by default, which removes the "trust the binary cache" assumption that the
-Comparator README mentions. Set `USE_MATHLIB_CACHE=1` to trade that away for speed.
+Comparator README mentions. With this Lake (4.34) `lake build --no-cache` is not enough on its own: it stops
+downloads, but Lake also restores modules from a local artifact cache by default (`~/.cache/lake` or an elan
+toolchain cache), which on a machine that has used Lean before may hold artifacts built elsewhere. The script
+therefore sets `LAKE_NO_CACHE=1`, `LAKE_ARTIFACT_CACHE=false` and a `LAKE_CACHE_DIR` inside the work directory,
+and clears variables that could point Lake at another toolchain, compiler or search path (`LEAN_PATH`, `LEAN_CC`,
+`ELAN_TOOLCHAIN`, …). Set `USE_MATHLIB_CACHE=1` to trade that away for speed.
 
 ## Running it
 
@@ -55,26 +61,73 @@ On any Linux machine with `git`, `curl`, `python3` (3.6+), about 40 GB of free d
 possible:
 
 ```bash
-git clone -b claude/gallant-pasteur-52wnri https://github.com/Todd7777/Solving-Navier-Stokes.git
+git clone https://github.com/Todd7777/Solving-Navier-Stokes.git
 cd Solving-Navier-Stokes
 WORK=$PWD/../ns-kernel-check audit/kernel-check/kernel_check.sh all
-```
-
-On FASRC, see the header of `fasrc.sbatch`, then:
-
-```bash
-sbatch audit/kernel-check/fasrc.sbatch
 ```
 
 Optional tools: Go ≥ 1.24 for the real `landrun` sandbox, and Rust (`cargo`) for the nanoda second kernel.
 Without them the job still runs, and `SUMMARY.txt` records which checks were skipped.
 
+### On Harvard FASRC (Cannon): three SLURM jobs
+
+The stages need very different resources, so each runs as its own job: `fasrc.sbatch` runs one stage, and
+`submit_fasrc.sh` submits all three, each starting only if the one before succeeded. On a login node:
+
+```bash
+git clone https://github.com/Todd7777/Solving-Navier-Stokes.git
+cd Solving-Navier-Stokes
+export WORK=$SCRATCH/<lab>/Lab/$USER/ns-kernel-check   # shared storage; FASRC's example lab is jharvard_lab
+audit/kernel-check/submit_fasrc.sh --dry-run           # prints the three sbatch commands
+audit/kernel-check/submit_fasrc.sh                     # submits them
+```
+
+| stage | partition | CPUs | memory | time limit | basis |
+|---|---|---|---|---|---|
+| fetch | `test` | 2 | 2 GB | 30 min | measured in a cloud session: 66 s, largest process 100 MB, 4.2 GB written; needs GitHub |
+| build | `sapphire` | 64 | 256 GB | 8 h | Mathlib from source: 2.30 million lines in 8,370 files at the pinned commit |
+| check | `sapphire` | 32 | 384 GB | 2 days | builds the solution (0.64 million lines, 2,655 files), then long single-threaded kernel replays |
+
+Only the fetch figures are measured; nothing has been built on Cannon yet. Lean sizes its thread pools by the CPUs of
+the node, not of the job, so the job sets `LEAN_NUM_THREADS` to its CPU count. `leanchecker NavierStokes Euler` replays
+modules in parallel, and each replay reads its own copy of the `.olean` files it imports (Lean maps a file at a fixed
+address only once per process), so the job runs one replay per 12 GB of memory (`LEANCHECKER_THREADS`).
+
+* **Resuming.** Everything lives in `WORK`. If a job runs out of time, submit again from that stage
+  (`submit_fasrc.sh build` submits build and check, `submit_fasrc.sh check` only check). Lake keeps every module already
+  built, and a re-run stage replaces its own lines in `SUMMARY.txt`. To change a request, e.g.
+  `KC_SBATCH_CHECK="--time=2-12:00"`; for every job, e.g. `KC_SBATCH_ALL="--account=<lab> --mail-type=END,FAIL"`.
+* **Killed is not rejected.** A step that fails with `rc=137` was killed, usually for exceeding its memory, and says
+  nothing about the proof. See `sacct -j <job> -o JobID,State,MaxRSS,ReqMem` and resubmit with more memory or a smaller
+  `LEANCHECKER_THREADS`.
+* **Network.** Only the fetch job needs it, plus the build job if `cargo` or Go is on your `PATH` (to clone nanoda or
+  landrun). If compute nodes cannot reach GitHub, run `audit/kernel-check/kernel_check.sh fetch` on a login node with
+  `WORK` set (about 20 s of CPU) and then `submit_fasrc.sh build`.
+* **Sandbox.** landrun needs Landlock (Linux 5.13 or later). FASRC's compute nodes run Rocky Linux 8.10 with kernel 4.18
+  (FASRC, June 2025), so expect Comparator's unsandboxed shim; `SUMMARY.txt` and `machine-check.txt` record what the
+  check node had. See "Trust that remains after a PASS".
+* **Optional tools** come from the `PATH` you submit with: install Rust (rustup) first if you want the nanoda kernel.
+* **Scratch is purged.** FASRC deletes netscratch files older than 90 days (60 from December 2026). Copy `results/`
+  out when the check finishes.
+
 ## Results
 
 Everything lands in `$WORK/results/`. `SUMMARY.txt` has one PASS/FAIL line per check and an `OVERALL` line.
-Logs for each step sit next to it. To publish a run, copy `results/` into `audit/results/kernel-check-<date>/` in this repository
-and commit it. Any FAIL line in Comparator, `#print axioms` or `leanchecker` would be a finding of the first order and
-should be reported with its log.
+Logs for each step sit next to it, `machine-<stage>.txt` describes the machine each stage ran on, and under SLURM
+`jobs.log` lists the jobs and the commit of this repository they ran. The SLURM check job ends as FAILED unless
+`OVERALL` is PASS. To publish a run, from the repository checkout:
+
+```bash
+d=audit/results/kernel-check-$(date -u +%F)
+mkdir -p "$d" && cp -r "$WORK/results/." "$d/"
+git switch -c "kernel-check-$(date -u +%F)"
+git add "$d" && git commit -m "Kernel-check results from FASRC Cannon"
+git push -u origin HEAD
+```
+
+and open a pull request. This repository is public, and the logs contain cluster paths and your username. Any FAIL
+line in Comparator, `#print axioms` or `leanchecker` would be a finding of the first order and should be reported with
+its log, once a killed process (`rc=137`) has been ruled out.
 
 ## Why this was not run here
 
@@ -83,3 +136,7 @@ dependency, and it verified all hashes (the `fetch` phase passed end to end on 7
 refused by that session's permission policy, which does not allow executing externally obtained code (about 2.9
 million lines of Lean). The machine also had only 4 cores, against roughly 30–60 CPU-hours of work. The job is
 written to be run where that is allowed and fast.
+
+On 9 November 2026 a later cloud session ran the fetch stage again, through `fasrc.sbatch` and into an empty
+directory: every hash and revision matched, and the network policy blocked no host. That session did not build or
+check either; the SLURM jobs above exist for that.

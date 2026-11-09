@@ -15,13 +15,14 @@ set -f   # option strings are split into words below; never glob them
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/../.." && pwd)
 
-# Default resources (see README.md). Cannon, per FASRC's partition table: `test` allows 12 hours
-# and 5 jobs per user; `sapphire` nodes have 112 cores and 990 GB, and allow 3 days.
+# Default resources (see README.md). Cannon, per FASRC's docs: `test` allows 12 hours and 5 jobs
+# per user and is exempt from fairshare; `sapphire` nodes have 112 cores and 990 GB, allow 3 days,
+# and cost the least fairshare of the general CPU partitions (0.6 per core-hour).
 resources() {
   case $1 in
     fetch) echo "--partition=test --cpus-per-task=2 --mem=2G --time=0-00:30" ;;
     build) echo "--partition=sapphire --cpus-per-task=64 --mem=256G --time=0-08:00" ;;
-    check) echo "--partition=sapphire --cpus-per-task=32 --mem=384G --time=2-00:00" ;;
+    check) echo "--partition=sapphire --cpus-per-task=16 --mem=256G --time=2-00:00" ;;
   esac
 }
 extra() {

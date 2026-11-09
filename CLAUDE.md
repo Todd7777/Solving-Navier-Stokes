@@ -24,7 +24,7 @@ Unforced global regularity, statements (A) and (B), is open, and this repository
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-python -m pytest -q   # 2026-11-09: 15 pass
+python -m pytest -q   # 2026-11-09: 16 pass
 ```
 
 In the cloud environment `pytest` on PATH can be a uv tool without numpy or sympy, which fails at collection;
@@ -37,6 +37,9 @@ In the cloud environment `pytest` on PATH can be a uv tool without numpy or symp
   is the wrong place for it. Run it on a cluster: `audit/kernel-check/submit_fasrc.sh` submits fetch, build and
   check as three chained SLURM jobs on FASRC Cannon (`audit/kernel-check/README.md`).
 - The fetch stage passed in a cloud session on 2026-11-09, with no host blocked. Build and check have not been run.
+- GitHub's free runners (4 CPUs, 16 GB RAM, 6 hours per job) are, by estimate and untried, too small for the full
+  check: Comparator holds the exported proof in memory and the kernel replays are long and single-threaded. The
+  README's Fairshare note says how to keep the FASRC cost down.
 - The audit itself could not rebuild the proof. `docs/03-audit-openai-lean-formalization.md`, Section 7, says
   what was and was not checked and gives the exact rebuild commands.
 

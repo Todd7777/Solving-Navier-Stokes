@@ -86,7 +86,7 @@ audit/kernel-check/submit_fasrc.sh                     # submits them
 |---|---|---|---|---|---|
 | fetch | `test` | 2 | 2 GB | 30 min | measured in a cloud session: 66 s, largest process 100 MB, 4.2 GB written; needs GitHub |
 | build | `sapphire` | 64 | 256 GB | 8 h | Mathlib from source: 2.30 million lines in 8,370 files at the pinned commit |
-| check | `sapphire` | 32 | 384 GB | 2 days | builds the solution (0.64 million lines, 2,655 files), then long single-threaded kernel replays |
+| check | `sapphire` | 16 | 256 GB | 2 days | builds the solution (0.64 million lines, 2,655 files), then long single-threaded kernel replays |
 
 Only the fetch figures are measured; nothing has been built on Cannon yet. Lean sizes its thread pools by the CPUs of
 the node, not of the job, so the job sets `LEAN_NUM_THREADS` to its CPU count. `leanchecker NavierStokes Euler` replays
@@ -95,11 +95,21 @@ address only once per process), so the job runs one replay per 12 GB of memory (
 
 * **Resuming.** Everything lives in `WORK`. If a job runs out of time, submit again from that stage
   (`submit_fasrc.sh build` submits build and check, `submit_fasrc.sh check` only check). Lake keeps every module already
-  built, and a re-run stage replaces its own lines in `SUMMARY.txt`. To change a request, e.g.
+  built, and a re-run stage replaces its own lines in `SUMMARY.txt`. A check can also keep the steps that already
+  passed and redo only the rest: `RESUME_CHECK=1 audit/kernel-check/submit_fasrc.sh check`. To change a request, e.g.
   `KC_SBATCH_CHECK="--time=2-12:00"`; for every job, e.g. `KC_SBATCH_ALL="--account=<lab> --mail-type=END,FAIL"`.
+* **Fairshare.** Every job is CPU-only. FASRC charges the cores and memory a job was given for as long as it runs,
+  failed and killed jobs included. `sapphire` costs 0.6 per core-hour and, by FASRC's formula, about 0.07 per GB-hour
+  (exact weights: `scontrol show partition sapphire`), less than `shared` (1.0 per core-hour) or the requeue
+  partitions (0.125 per GB-hour); `test` is exempt but meant for development and testing. At these sizes a 2-hour
+  build would cost about 110 TRES-hours and a 12-hour check about 320. The check asks for only 16 cores because most
+  of it is single-threaded. To spend less: try the build on `test` for an hour first
+  (`KC_SBATCH_BUILD="--partition=test --time=0-01:00" audit/kernel-check/submit_fasrc.sh`; the check job is then
+  cancelled, and a later `submit_fasrc.sh build` continues where the test stopped), resume instead of restarting, and
+  size later runs with `seff <job>`.
 * **Killed is not rejected.** A step that fails with `rc=137` was killed, usually for exceeding its memory, and says
   nothing about the proof. See `sacct -j <job> -o JobID,State,MaxRSS,ReqMem` and resubmit with more memory or a smaller
-  `LEANCHECKER_THREADS`.
+  `LEANCHECKER_THREADS`, with `RESUME_CHECK=1` so that only the killed step runs again.
 * **Network.** Only the fetch job needs it, plus the build job if `cargo` or Go is on your `PATH` (to clone nanoda or
   landrun). If compute nodes cannot reach GitHub, run `audit/kernel-check/kernel_check.sh fetch` on a login node with
   `WORK` set (about 20 s of CPU) and then `submit_fasrc.sh build`.

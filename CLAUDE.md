@@ -24,7 +24,7 @@ Unforced global regularity, statements (A) and (B), is open, and this repository
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-pytest -q          # 2026-11-08: 7 pass
+python -m pytest -q   # 2026-11-10: 7 pass (python -m: a standalone `pytest` may use another interpreter)
 ```
 
 ## State on 2026-11-08

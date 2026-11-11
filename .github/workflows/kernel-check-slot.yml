@@ -1,0 +1,110 @@
+# One slot of the kernel check on a GitHub-hosted runner, called by kernel-check.yml.
+# See audit/kernel-check/README.md, "On GitHub Actions".
+name: kernel-check slot
+
+on:
+  workflow_call:
+    inputs:
+      slot:
+        description: This slot's number, two digits ("01" to "20")
+        type: string
+        required: true
+      prev:
+        description: The previous slot's number ("00" for the first slot)
+        type: string
+        required: true
+      nanoda:
+        description: Build and run the nanoda second kernel
+        type: boolean
+        default: false
+      sandbox:
+        description: Comparator's sandbox, auto or fake
+        type: string
+        default: auto
+    outputs:
+      finished:
+        description: "'true' once fetch, build and check are all done"
+        value: ${{ jobs.slot.outputs.finished }}
+
+permissions:
+  contents: read
+
+jobs:
+  slot:
+    name: slot ${{ inputs.slot }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.work.outputs.finished }}
+    env:
+      WORK: /home/runner/kc-work
+      KC_SLOT: ${{ inputs.slot }}
+      # The work directory goes from slot to slot through the Actions cache (10 GB per repository).
+      # The Lean zip is left out (its extracted toolchain is kept), and so are temporary files.
+      KC_STATE: |
+        /home/runner/kc-work
+        !/home/runner/kc-work/tmp
+        !/home/runner/kc-work/tools/*.zip
+    steps:
+      - name: Set this slot's deadline (5 hours of work, then time to save the state)
+        run: echo "KC_DEADLINE=$(( $(date +%s) + 300 * 60 ))" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Make room on disk
+        run: |
+          df -h / /mnt || true
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift \
+            /usr/local/share/powershell /opt/microsoft /opt/google /usr/lib/jvm
+          sudo docker image prune --all --force > /dev/null || true
+          mkdir -p "$WORK"
+          # The path stays fixed for the cache; the data goes on the larger of / and /mnt.
+          root_free=$(df --output=avail -B1G / | tail -n 1)
+          mnt_free=$(df --output=avail -B1G /mnt 2> /dev/null | tail -n 1 || echo 0)
+          if [ "${mnt_free:-0}" -gt "$root_free" ]; then
+            sudo mkdir -p /mnt/kc-work
+            sudo chown "$(id -u):$(id -g)" /mnt/kc-work
+            sudo mount --bind /mnt/kc-work "$WORK"
+          fi
+          df -h / /mnt "$WORK" || true
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.x'
+          cache: false
+
+      - name: Restore the work directory (this slot's earlier attempt, else the previous slot)
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.KC_STATE }}
+          key: kc-${{ github.run_id }}-slot-${{ inputs.slot }}-attempt-${{ github.run_attempt }}
+          restore-keys: |
+            kc-${{ github.run_id }}-slot-${{ inputs.slot }}-
+            kc-${{ github.run_id }}-slot-${{ inputs.prev }}-
+          fail-on-cache-miss: ${{ inputs.prev != '00' }}
+
+      - name: Fetch, build and check until done or out of time
+        id: work
+        run: audit/kernel-check/github_slot.sh
+        env:
+          SANDBOX: ${{ inputs.sandbox }}
+          NANODA: ${{ inputs.nanoda && '1' || '0' }}
+
+      - name: Save the work directory for the next slot
+        if: always() && steps.work.outcome != 'skipped' && steps.work.outputs.finished != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.KC_STATE }}
+          key: kc-${{ github.run_id }}-slot-${{ inputs.slot }}-attempt-${{ github.run_attempt }}
+
+      - name: Upload this slot's results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-slot-${{ inputs.slot }}-attempt-${{ github.run_attempt }}
+          path: /home/runner/kc-work/results
+          retention-days: 30
+          if-no-files-found: warn

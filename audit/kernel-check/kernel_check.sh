@@ -12,9 +12,10 @@
 #          its sandbox), then #print axioms, leanchecker (incl. --fresh), and a static scan.
 #          Writes results/SUMMARY.txt.
 #
-# The stages can run as separate jobs (fasrc.sbatch runs them under SLURM). Re-running a stage
-# is safe: downloads and finished Lake builds in WORK are reused, and the stage's lines in
-# SUMMARY.txt are replaced, not appended to.
+# The stages can run as separate jobs (fasrc.sbatch runs them under SLURM, github_slot.sh on
+# GitHub-hosted runners). Re-running a stage is safe: downloads and finished Lake builds in WORK
+# are reused, and the stage's lines in SUMMARY.txt are replaced, not appended to. A stage that
+# completes leaves results/summary/<stage>.done.
 #
 # Environment knobs:
 #   WORK=/path            working directory (default: $PWD/ns-kernel-check)
@@ -31,6 +32,14 @@
 #                         Mathlib), so memory is the limit. Default min(CPUs, GB of RAM / 12).
 #   RESUME_CHECK=1        continue an interrupted or partly failed check: steps already recorded
 #                         as PASS are kept and skipped; everything else runs again. Default 0.
+#   RESUME_CHECK=all      continue an interrupted check: every recorded result, PASS or FAIL, is
+#                         kept; only steps without one run again.
+#   MAX_STEP_ATTEMPTS=n   in a resumed check, a step that has already been started n times without
+#                         finishing is recorded as FAIL instead of starting again. Default 0 (no limit).
+#   LEANCHECKER_PART=n    replay the NavierStokes.* and Euler.* modules in parts of about n modules
+#                         each, every part a step of its own. Default 0 (one step for all).
+#   STOP_AT=t             do not start another step after time t (seconds since the epoch): exit
+#                         with status 75 instead, so that a resumed run carries on. Default: none.
 set -euo pipefail
 
 # ---------------------------------------------------------------- pinned inputs
@@ -69,6 +78,13 @@ NANODA=${NANODA:-auto}
 LEAN_ZIP_PATH=${LEAN_ZIP_PATH:-}
 LEANCHECKER_THREADS=${LEANCHECKER_THREADS:-}
 RESUME_CHECK=${RESUME_CHECK:-0}
+MAX_STEP_ATTEMPTS=${MAX_STEP_ATTEMPTS:-0}
+LEANCHECKER_PART=${LEANCHECKER_PART:-0}
+STOP_AT=${STOP_AT:-}
+case $RESUME_CHECK in 0|1|all) ;; *) echo "RESUME_CHECK must be 0, 1 or all" >&2; exit 2 ;; esac
+case $MAX_STEP_ATTEMPTS$LEANCHECKER_PART$STOP_AT in
+  *[!0-9]*) echo "MAX_STEP_ATTEMPTS, LEANCHECKER_PART and STOP_AT must be whole numbers" >&2; exit 2 ;;
+esac
 PROJ=$WORK/NavierStokesAndEuler
 TOOLS=$WORK/tools
 LEANBIN=$TOOLS/lean-${LEAN_VERSION}-linux/bin
@@ -85,30 +101,43 @@ record_once() { # record, unless this exact line is already there (a resumed che
   grep -Fxq -- "$(printf '%-58s %s' "$1" "$2")" "$RESULTS/summary/$STAGE.txt" 2>/dev/null || record "$1" "$2"
 }
 die()    { log "FATAL: $*"; record "FATAL" "$*"; exit 1; }
-resuming() { [ "$STAGE" = check ] && [ "$RESUME_CHECK" = 1 ]; }
-passed_before() { # passed_before <label>: this resumed check already recorded <label> as PASS
+resuming() { [ "$STAGE" = check ] && [ "$RESUME_CHECK" != 0 ]; }
+kept_result() { # kept_result <label>: if this resumed check keeps a result for <label>, print it
   resuming || return 1
-  awk -v l="$1" 'index($0, l " ") == 1 { s = substr($0, length(l) + 2); sub(/^ +/, "", s); if (s ~ /^PASS/) f = 1 }
-                 END { exit !f }' "$RESULTS/summary/$STAGE.txt"
+  awk -v l="$1" -v keep_fail="$([ "$RESUME_CHECK" = all ] && echo 1 || echo 0)" '
+    index($0, l " ") == 1 { s = substr($0, length(l) + 2); sub(/^ +/, "", s); if (keep_fail || s ~ /^PASS/) { r = s; f = 1 } }
+    END { if (f) print r; exit !f }' "$RESULTS/summary/$STAGE.txt"
 }
-begin()  { # begin <stage>: start a stage on this machine (a resumed check keeps what passed)
+begin()  { # begin <stage>: start a stage on this machine (a resumed check keeps earlier results)
   STAGE=$1
-  local part=$RESULTS/summary/$STAGE.txt
+  local part=$RESULTS/summary/$STAGE.txt drop='^(OVERALL|FATAL) |(^| )FAIL( |$)'
+  rm -f "$RESULTS/summary/$STAGE.done"
   if resuming && [ -f "$part" ]; then
-    grep -vE '^(OVERALL|FATAL) |(^| )FAIL( |$)' "$part" >"$part.kept" || true
+    if [ "$RESUME_CHECK" = all ]; then drop='^(OVERALL|FATAL) '; fi
+    grep -vE "$drop" "$part" >"$part.kept" || true
     mv "$part.kept" "$part"
   else
     : >"$part"
     : >"$RESULTS/machine-$STAGE.txt"
+    rm -f "$RESULTS/summary/$STAGE.attempts"
   fi
   summarize
   { echo "host $(hostname)  cpus $(nproc)  mem $(free -g | awk '/Mem:/{print $2}')G  kernel $(uname -r)  Landlock $(landlock_active && echo yes || echo no)"
     date -u; } >>"$RESULTS/machine-$STAGE.txt"
-  log "stage $STAGE on $(hostname)$(resuming && echo ', resuming: steps that passed are kept')"
+  log "stage $STAGE on $(hostname)$(resuming && echo ", resuming (RESUME_CHECK=$RESUME_CHECK)")"
 }
+end_stage() { : >"$RESULTS/summary/$STAGE.done"; log "stage $STAGE complete"; }
 timed()  { # timed <label> <logfile> <cmd...> : run, log output, record PASS/FAIL and seconds
-  local label=$1 out=$2; shift 2
-  if passed_before "$label"; then log "kept from an earlier run: $label"; return 0; fi
+  local label=$1 out=$2 kept n; shift 2
+  if kept=$(kept_result "$label"); then log "kept from an earlier run: $label: $kept"; [[ $kept == PASS* ]]; return; fi
+  if [ -n "$STOP_AT" ] && [ "$(date +%s)" -ge "$STOP_AT" ]; then log "out of time, not starting: $label"; exit 75; fi
+  if resuming && [ "$MAX_STEP_ATTEMPTS" -gt 0 ]; then
+    n=$(grep -Fxc -- "$label" "$RESULTS/summary/check.attempts" 2>/dev/null || true)
+    if [ "${n:-0}" -ge "$MAX_STEP_ATTEMPTS" ]; then
+      record "$label" "FAIL not finished in $n attempts (cut off by time limits)"; return 1
+    fi
+  fi
+  if [ "$STAGE" = check ]; then printf '%s\n' "$label" >>"$RESULTS/summary/check.attempts"; fi
   local t0=$SECONDS rc=0
   log "start: $label"
   "$@" >"$out" 2>&1 || rc=$?
@@ -223,6 +252,9 @@ build_tools() {
     (cd "$TOOLS/nanoda_lib" && cargo build --release)
     echo "$TOOLS/nanoda_lib/target/release/nanoda_bin" >"$TOOLS/NANODA"
     record "second kernel" "nanoda $(git -C "$TOOLS/nanoda_lib" rev-parse --short HEAD)"
+  elif [ "$NANODA" = 0 ]; then
+    rm -f "$TOOLS/NANODA"
+    record "second kernel" "NOT RUN (NANODA=0)"
   else
     rm -f "$TOOLS/NANODA"
     record "second kernel" "NOT RUN (no cargo; set NANODA=1 after installing Rust)"
@@ -264,8 +296,8 @@ PY
 }
 
 check_axioms() {
-  local f out rc=0 label="main theorems use only propext/choice/Quot.sound"
-  if passed_before "$label"; then log "kept from an earlier run: $label"; return 0; fi
+  local f out rc=0 kept label="main theorems use only propext/choice/Quot.sound"
+  if kept=$(kept_result "$label"); then log "kept from an earlier run: $label: $kept"; return 0; fi
   for f in PrintAxiomsNavierStokes PrintAxiomsEuler; do
     out=$RESULTS/$f.txt
     timed "#print axioms ($f)" "$out" lake env lean "$HERE/$f.lean" || rc=1
@@ -305,6 +337,35 @@ leanchecker_threads() { # min(CPUs, GB of RAM / 12), at least 1
   echo "$n"
 }
 
+leanchecker_parts() { # leanchecker_parts <n>: the built NavierStokes.* and Euler.* modules as lines of
+  # leanchecker arguments, about <n> modules per line. leanchecker takes module-name prefixes, so a
+  # module with submodules (NavierStokes.R3) is named once and stands for its subtree. The library
+  # roots NavierStokes and Euler are left out: their files contain only imports.
+  python3 -I - "$PROJ/.lake/build/lib/lean" "$1" <<'PY'
+import pathlib, sys
+lib, size = pathlib.Path(sys.argv[1]), int(sys.argv[2])
+mods = sorted(".".join(p.relative_to(lib).parts)[:-len(".olean")]
+              for top in ("NavierStokes", "Euler") if (lib / top).is_dir()
+              for p in (lib / top).rglob("*.olean"))
+names = set(mods)
+def root(m):  # the shortest module that m lies under (m itself if none)
+    parts = m.split(".")
+    return next(".".join(parts[:i]) for i in range(2, len(parts) + 1) if ".".join(parts[:i]) in names)
+count = {}
+for m in mods:
+    count[root(m)] = count.get(root(m), 0) + 1
+line, n = [], 0
+for r in sorted(count):
+    if line and n + count[r] > size:
+        print(" ".join(line))
+        line, n = [], 0
+    line.append(r)
+    n += count[r]
+if line:
+    print(" ".join(line))
+PY
+}
+
 check() {
   lean_env
   [ -f "$TOOLS/LANDRUN" ] || die "run '$0 build' first"
@@ -317,8 +378,24 @@ check() {
   # process is read into the heap instead. Parallel replays therefore each hold a private copy.
   local lct=${LEANCHECKER_THREADS:-$(leanchecker_threads)}
   log "leanchecker: $lct modules at a time"
-  timed "leanchecker: replay every NavierStokes.* and Euler.* module" "$RESULTS/leanchecker-modules.log" \
-    env LEAN_NUM_THREADS="$lct" lake env leanchecker NavierStokes Euler || true
+  if [ "$LEANCHECKER_PART" -gt 0 ]; then
+    local k=0 parts roots
+    # A resumed check keeps the parts it started with, so that "part k of n" always names the same modules.
+    if ! resuming || [ ! -s "$RESULTS/leanchecker-parts.txt" ]; then
+      leanchecker_parts "$LEANCHECKER_PART" >"$RESULTS/leanchecker-parts.txt"
+    fi
+    parts=$(($(wc -l <"$RESULTS/leanchecker-parts.txt")))
+    [ "$parts" -gt 0 ] || record_once "leanchecker: replay modules" "FAIL no built NavierStokes.* or Euler.* module found"
+    while IFS= read -r roots <&3; do
+      k=$((k + 1))
+      # shellcheck disable=SC2086  # one argument per module name
+      timed "leanchecker: replay modules, part $k of $parts" "$RESULTS/leanchecker-modules-$k.log" \
+        env LEAN_NUM_THREADS="$lct" lake env leanchecker $roots || true
+    done 3<"$RESULTS/leanchecker-parts.txt"
+  else
+    timed "leanchecker: replay every NavierStokes.* and Euler.* module" "$RESULTS/leanchecker-modules.log" \
+      env LEAN_NUM_THREADS="$lct" lake env leanchecker NavierStokes Euler || true
+  fi
   timed "leanchecker --fresh NavierStokes.ComparatorSolution (whole env)" "$RESULTS/leanchecker-fresh-ns.log" \
     lake env leanchecker --fresh NavierStokes.ComparatorSolution || true
   timed "leanchecker --fresh Euler.Solution (whole env)" "$RESULTS/leanchecker-fresh-euler.log" \
@@ -329,9 +406,11 @@ check() {
 }
 
 case "${1:-all}" in
-  fetch) begin fetch; fetch_lean; fetch_repo; fetch_deps ;;
-  build) begin build; build ;;
-  check) begin check; check ;;
-  all)   begin fetch; fetch_lean; fetch_repo; fetch_deps; begin build; build; begin check; check ;;
+  fetch) begin fetch; fetch_lean; fetch_repo; fetch_deps; end_stage ;;
+  build) begin build; build; end_stage ;;
+  check) begin check; check; end_stage ;;
+  all)   begin fetch; fetch_lean; fetch_repo; fetch_deps; end_stage
+         begin build; build; end_stage
+         begin check; check; end_stage ;;
   *) echo "usage: $0 [fetch|build|check|all]" >&2; exit 2 ;;
 esac

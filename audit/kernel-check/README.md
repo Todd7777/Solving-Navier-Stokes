@@ -11,6 +11,7 @@ wrote it (see "Why this was not run here" below).
 | `kernel_check.sh` | portable driver: `fetch`, `build`, `check`, or `all` |
 | `fasrc.sbatch` | runs one stage as a SLURM job on Harvard FASRC (Cannon) |
 | `submit_fasrc.sh` | submits fetch, build and check as three chained SLURM jobs |
+| `github_slot.sh` | one job of the GitHub Actions run (`.github/workflows/kernel-check.yml`) |
 | `PrintAxiomsNavierStokes.lean`, `PrintAxiomsEuler.lean` | `#print axioms` for the four main theorems |
 
 ## What the job checks
@@ -120,11 +121,39 @@ address only once per process), so the job runs one replay per 12 GB of memory (
 * **Scratch is purged.** FASRC deletes netscratch files older than 90 days (60 from December 2026). Copy `results/`
   out when the check finishes.
 
+### On GitHub Actions (free, experimental)
+
+`.github/workflows/kernel-check.yml` runs the same stages on GitHub's free runners, which give a public repository
+4 CPUs, 16 GB of memory and at most 6 hours per job. The work goes through up to 20 chained jobs ("slots"). Each slot
+works for about 5 hours from wherever the previous one stopped, then saves the work directory in the repository's
+Actions cache for the next. Only `workflow_dispatch` starts it, and GitHub offers that only once the workflow file is
+on the default branch. Then use Actions > kernel-check > Run workflow, or:
+
+```bash
+gh workflow run kernel-check.yml
+```
+
+Each slot's `results/` is an artifact (`results-slot-NN-attempt-M`). The final `report` job shows the latest
+`SUMMARY.txt` and fails unless the check finished with `OVERALL` PASS.
+
+What to expect (an estimate; it has not been run yet). Fetch and the Mathlib build should finish in a few slots. The
+check replays one module at a time and splits `leanchecker NavierStokes Euler` into parts of about 300 modules, so that
+each part fits in a slot (`LEANCHECKER_PART`). A step cut off by a slot's time limit starts again in the next slot, at
+most three times, and is then recorded as `FAIL not finished`. A step killed for memory (`rc=137`) is recorded and not
+retried. Comparator is the likeliest case, since it holds the whole exported proof in memory. On a 16 GB runner either
+outcome is a limit of the runner, not a finding about the proof. The nanoda kernel is off by default for the same reason.
+
+Trust: the build is still from source, but GitHub's runners and its cache, which carries the build from slot to slot,
+join the trusted base. A runner's kernel may offer Landlock, in which case Comparator runs inside real landrun;
+`SUMMARY.txt` records which sandbox ran. "Re-run failed jobs" on a failed slot resumes from what that slot saved. A run
+fills most of the repository's 10 GB Actions cache; the last entry expires after 7 days unused, or can be deleted
+under Actions > Caches.
+
 ## Results
 
 Everything lands in `$WORK/results/`. `SUMMARY.txt` has one PASS/FAIL line per check and an `OVERALL` line.
-Logs for each step sit next to it, `machine-<stage>.txt` describes the machine each stage ran on, and under SLURM
-`jobs.log` lists the jobs and the commit of this repository they ran. The SLURM check job ends as FAILED unless
+Logs for each step sit next to it, `machine-<stage>.txt` describes the machine each stage ran on, and under SLURM or
+GitHub Actions `jobs.log` lists the jobs and the commit of this repository they ran. The SLURM check job ends as FAILED unless
 `OVERALL` is PASS. To publish a run, from the repository checkout:
 
 ```bash

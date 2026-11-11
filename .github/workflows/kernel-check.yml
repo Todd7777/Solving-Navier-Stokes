@@ -1,0 +1,252 @@
+# Independent kernel check of OpenAI's Lean proof of Clay statements (C)/(D) on free GitHub-hosted
+# runners. Experimental: a runner has 4 CPUs, 16 GB and 6 hours per job, so the work runs in up to
+# 20 chained jobs ("slots"), each starting only if the one before ended unfinished, with the work
+# directory carried between them in the Actions cache. Started by hand only:
+#   Actions > kernel-check > Run workflow, or `gh workflow run kernel-check.yml`.
+# See audit/kernel-check/README.md, "On GitHub Actions".
+name: kernel-check
+
+on:
+  workflow_dispatch:
+    inputs:
+      nanoda:
+        description: Also run the nanoda second kernel (it likely needs more than the runner's 16 GB)
+        type: boolean
+        default: false
+      sandbox:
+        description: Comparator's sandbox (auto uses landrun if the runner's kernel has Landlock)
+        type: choice
+        options: [auto, fake]
+        default: auto
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kernel-check
+  cancel-in-progress: false
+
+jobs:
+  slot-01:
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '01'
+      prev: '00'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-02:
+    needs: slot-01
+    if: needs.slot-01.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '02'
+      prev: '01'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-03:
+    needs: slot-02
+    if: needs.slot-02.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '03'
+      prev: '02'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-04:
+    needs: slot-03
+    if: needs.slot-03.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '04'
+      prev: '03'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-05:
+    needs: slot-04
+    if: needs.slot-04.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '05'
+      prev: '04'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-06:
+    needs: slot-05
+    if: needs.slot-05.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '06'
+      prev: '05'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-07:
+    needs: slot-06
+    if: needs.slot-06.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '07'
+      prev: '06'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-08:
+    needs: slot-07
+    if: needs.slot-07.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '08'
+      prev: '07'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-09:
+    needs: slot-08
+    if: needs.slot-08.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '09'
+      prev: '08'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-10:
+    needs: slot-09
+    if: needs.slot-09.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '10'
+      prev: '09'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-11:
+    needs: slot-10
+    if: needs.slot-10.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '11'
+      prev: '10'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-12:
+    needs: slot-11
+    if: needs.slot-11.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '12'
+      prev: '11'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-13:
+    needs: slot-12
+    if: needs.slot-12.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '13'
+      prev: '12'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-14:
+    needs: slot-13
+    if: needs.slot-13.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '14'
+      prev: '13'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-15:
+    needs: slot-14
+    if: needs.slot-14.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '15'
+      prev: '14'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-16:
+    needs: slot-15
+    if: needs.slot-15.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '16'
+      prev: '15'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-17:
+    needs: slot-16
+    if: needs.slot-16.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '17'
+      prev: '16'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-18:
+    needs: slot-17
+    if: needs.slot-17.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '18'
+      prev: '17'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-19:
+    needs: slot-18
+    if: needs.slot-18.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '19'
+      prev: '18'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  slot-20:
+    needs: slot-19
+    if: needs.slot-19.outputs.finished == 'false'
+    uses: ./.github/workflows/kernel-check-slot.yml
+    with:
+      slot: '20'
+      prev: '19'
+      nanoda: ${{ inputs.nanoda }}
+      sandbox: ${{ inputs.sandbox }}
+
+  report:
+    needs: [slot-01, slot-02, slot-03, slot-04, slot-05, slot-06, slot-07, slot-08, slot-09, slot-10, slot-11, slot-12, slot-13, slot-14, slot-15, slot-16, slot-17, slot-18, slot-19, slot-20]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: results-slot-*
+          path: slots
+      - name: Report the latest results
+        run: |
+          last=$(find slots -mindepth 1 -maxdepth 1 -type d -name 'results-slot-*' 2> /dev/null | sort -V | tail -n 1)
+          if [ -z "$last" ]; then echo "::error::no slot uploaded any results"; exit 1; fi
+          {
+            echo "## Kernel check of OpenAI's Lean proof of (C)/(D) on GitHub runners"
+            echo
+            echo "Latest results: \`$(basename "$last")\` (download it from this run's artifacts)"
+            echo
+            echo '```'
+            cat "$last/SUMMARY.txt" 2> /dev/null || echo "(no SUMMARY.txt)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ ! -f "$last/summary/check.done" ]; then echo "::error::the check did not finish"; exit 1; fi
+          grep -Eq '^OVERALL +PASS$' "$last/SUMMARY.txt" || { echo "::error::OVERALL is not PASS"; exit 1; }

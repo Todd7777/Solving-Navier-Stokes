@@ -24,22 +24,23 @@ Unforced global regularity, statements (A) and (B), is open, and this repository
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-python -m pytest -q   # 2026-11-09: 16 pass
+python -m pytest -q   # 2026-11-11: 21 pass
 ```
 
 In the cloud environment `pytest` on PATH can be a uv tool without numpy or sympy, which fails at collection;
 `python -m pytest` runs in the interpreter the requirements went into.
 
-## State on 2026-11-09
+## State on 2026-11-11
 
 - `audit/kernel-check/kernel_check.sh` rebuilds OpenAI's proof and runs the kernel checks. It is Linux-only and
   compiles Mathlib from source by default, which takes hours. A cloud session (about 4 CPUs and 16 GB of RAM)
   is the wrong place for it. Run it on a cluster: `audit/kernel-check/submit_fasrc.sh` submits fetch, build and
   check as three chained SLURM jobs on FASRC Cannon (`audit/kernel-check/README.md`).
 - The fetch stage passed in a cloud session on 2026-11-09, with no host blocked. Build and check have not been run.
-- GitHub's free runners (4 CPUs, 16 GB RAM, 6 hours per job) are, by estimate and untried, too small for the full
-  check: Comparator holds the exported proof in memory and the kernel replays are long and single-threaded. The
-  README's Fairshare note says how to keep the FASRC cost down.
+- `.github/workflows/kernel-check.yml` runs the same stages on GitHub's free runners (4 CPUs, 16 GB, 6 hours per
+  job) as up to 20 chained jobs. It is experimental and has not run yet; GitHub offers it only once it is on the
+  default branch. By estimate Comparator may not fit in 16 GB: a step killed for memory there is a limit of the
+  runner, not a finding about the proof. The README's Fairshare note says how to keep the FASRC cost down.
 - The audit itself could not rebuild the proof. `docs/03-audit-openai-lean-formalization.md`, Section 7, says
   what was and was not checked and gives the exact rebuild commands.
 

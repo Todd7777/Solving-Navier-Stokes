@@ -34,7 +34,7 @@ in full, verified by machine, or marked as someone else's claim with its evidenc
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-pytest -q
+python -m pytest -q
 ```
 
 ```bash

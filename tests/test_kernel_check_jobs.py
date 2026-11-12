@@ -35,6 +35,12 @@ def test_shell_syntax(script):
     assert r.returncode == 0, r.stderr
 
 
+def test_every_audit_script_is_executable():
+    # The first GitHub run failed at once because github_slot.sh was committed without its x bit.
+    scripts = sorted((ROOT / "audit").rglob("*.sh")) + [KC / "fasrc.sbatch"]
+    assert [s.relative_to(ROOT).as_posix() for s in scripts if not os.access(s, os.X_OK)] == []
+
+
 def test_dry_run_chains_fetch_build_check(tmp_path):
     work = tmp_path / "work"
     r = run("submit_fasrc.sh", "--dry-run", WORK=str(work))
@@ -220,7 +226,7 @@ def test_the_github_workflow_chains_twenty_slots_through_one_cache_key():
     uses = {s["uses"].split("@")[0]: s for s in steps if "uses" in s}
     work = next(s for s in steps if s.get("id") == "work")
     restore, save = uses["actions/cache/restore"], uses["actions/cache/save"]
-    assert work["run"] == "audit/kernel-check/github_slot.sh"
+    assert work["run"] == "bash audit/kernel-check/github_slot.sh"
     assert restore["with"]["path"] == save["with"]["path"] == "${{ env.KC_STATE }}"
     assert restore["with"]["key"] == save["with"]["key"]
     assert "steps.work.outputs.finished != 'true'" in save["if"]

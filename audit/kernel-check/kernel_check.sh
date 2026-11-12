@@ -12,6 +12,11 @@
 #          its sandbox), then #print axioms, leanchecker (incl. --fresh), and a static scan.
 #          Writes results/SUMMARY.txt.
 #
+# The stages can run as separate jobs (fasrc.sbatch runs them under SLURM, github_slot.sh on
+# GitHub-hosted runners). Re-running a stage is safe: downloads and finished Lake builds in WORK
+# are reused, and the stage's lines in SUMMARY.txt are replaced, not appended to. A stage that
+# completes leaves results/summary/<stage>.done.
+#
 # Environment knobs:
 #   WORK=/path            working directory (default: $PWD/ns-kernel-check)
 #   USE_MATHLIB_CACHE=1   download Mathlib's binary cache instead of compiling it (faster;
@@ -20,6 +25,21 @@
 #                         'fake' uses Comparator's own unsandboxed shim. Default auto.
 #   NANODA=auto|1|0       build/run the nanoda second kernel (needs cargo). Default auto.
 #   LEAN_ZIP_PATH=/path   reuse an already-downloaded copy of the Lean release zip.
+#   LEAN_NUM_THREADS=n    worker threads of Lake, Comparator and leanchecker. Lean's default is
+#                         every CPU of the machine, not the CPUs a batch job was given.
+#   LEANCHECKER_THREADS=n modules replayed at once by `leanchecker NavierStokes Euler`. Each
+#                         replay reads its own copy of the .olean files it imports (most of
+#                         Mathlib), so memory is the limit. Default min(CPUs, GB of RAM / 12).
+#   RESUME_CHECK=1        continue an interrupted or partly failed check: steps already recorded
+#                         as PASS are kept and skipped; everything else runs again. Default 0.
+#   RESUME_CHECK=all      continue an interrupted check: every recorded result, PASS or FAIL, is
+#                         kept; only steps without one run again.
+#   MAX_STEP_ATTEMPTS=n   in a resumed check, a step that has already been started n times without
+#                         finishing is recorded as FAIL instead of starting again. Default 0 (no limit).
+#   LEANCHECKER_PART=n    replay the NavierStokes.* and Euler.* modules in parts of about n modules
+#                         each, every part a step of its own. Default 0 (one step for all).
+#   STOP_AT=t             do not start another step after time t (seconds since the epoch): exit
+#                         with status 75 instead, so that a resumed run carries on. Default: none.
 set -euo pipefail
 
 # ---------------------------------------------------------------- pinned inputs
@@ -51,28 +71,93 @@ Euler.exists_compact_smooth_euler_singularity'
 # ---------------------------------------------------------------- settings
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WORK=${WORK:-$PWD/ns-kernel-check}
+mkdir -p "$WORK" && WORK=$(cd "$WORK" && pwd)   # absolute: later steps cd into the project
 USE_MATHLIB_CACHE=${USE_MATHLIB_CACHE:-0}
 SANDBOX=${SANDBOX:-auto}
 NANODA=${NANODA:-auto}
 LEAN_ZIP_PATH=${LEAN_ZIP_PATH:-}
+LEANCHECKER_THREADS=${LEANCHECKER_THREADS:-}
+RESUME_CHECK=${RESUME_CHECK:-0}
+MAX_STEP_ATTEMPTS=${MAX_STEP_ATTEMPTS:-0}
+LEANCHECKER_PART=${LEANCHECKER_PART:-0}
+STOP_AT=${STOP_AT:-}
+case $RESUME_CHECK in 0|1|all) ;; *) echo "RESUME_CHECK must be 0, 1 or all" >&2; exit 2 ;; esac
+case $MAX_STEP_ATTEMPTS$LEANCHECKER_PART$STOP_AT in
+  *[!0-9]*) echo "MAX_STEP_ATTEMPTS, LEANCHECKER_PART and STOP_AT must be whole numbers" >&2; exit 2 ;;
+esac
 PROJ=$WORK/NavierStokesAndEuler
 TOOLS=$WORK/tools
 LEANBIN=$TOOLS/lean-${LEAN_VERSION}-linux/bin
 RESULTS=$WORK/results
-mkdir -p "$WORK" "$TOOLS" "$RESULTS"
+mkdir -p "$TOOLS" "$RESULTS/summary"
 LOG=$RESULTS/run.log
+STAGE=none
 
 log()    { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$LOG" >&2; }
-record() { printf '%-58s %s\n' "$1" "$2" | tee -a "$RESULTS/SUMMARY.txt" >&2; }
+# SUMMARY.txt is assembled from one file per stage, so re-running a stage replaces its lines.
+summarize() { cat "$RESULTS"/summary/{fetch,build,check}.txt >"$RESULTS/SUMMARY.txt" 2>/dev/null || true; }
+record() { printf '%-58s %s\n' "$1" "$2" | tee -a "$RESULTS/summary/$STAGE.txt" >&2; summarize; }
+record_once() { # record, unless this exact line is already there (a resumed check)
+  grep -Fxq -- "$(printf '%-58s %s' "$1" "$2")" "$RESULTS/summary/$STAGE.txt" 2>/dev/null || record "$1" "$2"
+}
 die()    { log "FATAL: $*"; record "FATAL" "$*"; exit 1; }
+resuming() { [ "$STAGE" = check ] && [ "$RESUME_CHECK" != 0 ]; }
+kept_result() { # kept_result <label>: if this resumed check keeps a result for <label>, print it
+  resuming || return 1
+  awk -v l="$1" -v keep_fail="$([ "$RESUME_CHECK" = all ] && echo 1 || echo 0)" '
+    index($0, l " ") == 1 { s = substr($0, length(l) + 2); sub(/^ +/, "", s); if (keep_fail || s ~ /^PASS/) { r = s; f = 1 } }
+    END { if (f) print r; exit !f }' "$RESULTS/summary/$STAGE.txt"
+}
+begin()  { # begin <stage>: start a stage on this machine (a resumed check keeps earlier results)
+  STAGE=$1
+  local part=$RESULTS/summary/$STAGE.txt drop='^(OVERALL|FATAL) |(^| )FAIL( |$)'
+  rm -f "$RESULTS/summary/$STAGE.done"
+  if resuming && [ -f "$part" ]; then
+    if [ "$RESUME_CHECK" = all ]; then drop='^(OVERALL|FATAL) '; fi
+    grep -vE "$drop" "$part" >"$part.kept" || true
+    mv "$part.kept" "$part"
+  else
+    : >"$part"
+    : >"$RESULTS/machine-$STAGE.txt"
+    rm -f "$RESULTS/summary/$STAGE.attempts"
+  fi
+  summarize
+  { echo "host $(hostname)  cpus $(nproc)  mem $(free -g | awk '/Mem:/{print $2}')G  kernel $(uname -r)  Landlock $(landlock_active && echo yes || echo no)"
+    date -u; } >>"$RESULTS/machine-$STAGE.txt"
+  log "stage $STAGE on $(hostname)$(resuming && echo ", resuming (RESUME_CHECK=$RESUME_CHECK)")"
+}
+end_stage() { : >"$RESULTS/summary/$STAGE.done"; log "stage $STAGE complete"; }
 timed()  { # timed <label> <logfile> <cmd...> : run, log output, record PASS/FAIL and seconds
-  local label=$1 out=$2; shift 2
+  local label=$1 out=$2 kept n; shift 2
+  if kept=$(kept_result "$label"); then log "kept from an earlier run: $label: $kept"; [[ $kept == PASS* ]]; return; fi
+  if [ -n "$STOP_AT" ] && [ "$(date +%s)" -ge "$STOP_AT" ]; then log "out of time, not starting: $label"; exit 75; fi
+  if resuming && [ "$MAX_STEP_ATTEMPTS" -gt 0 ]; then
+    n=$(grep -Fxc -- "$label" "$RESULTS/summary/check.attempts" 2>/dev/null || true)
+    if [ "${n:-0}" -ge "$MAX_STEP_ATTEMPTS" ]; then
+      record "$label" "FAIL not finished in $n attempts (cut off by time limits)"; return 1
+    fi
+  fi
+  if [ "$STAGE" = check ]; then printf '%s\n' "$label" >>"$RESULTS/summary/check.attempts"; fi
   local t0=$SECONDS rc=0
   log "start: $label"
   "$@" >"$out" 2>&1 || rc=$?
   if [ $rc -eq 0 ]; then record "$label" "PASS ($((SECONDS - t0)) s)"; else record "$label" "FAIL rc=$rc ($((SECONDS - t0)) s) see $(basename "$out")"; fi
   return $rc
 }
+
+# ---------------------------------------------------------------- environment
+# Only the pinned toolchain in $LEANBIN may be used: drop variables that would point Lake or
+# Lean at another toolchain, compiler, search path or package URL.
+unset LEAN LEAN_PATH LEAN_SRC_PATH LEAN_SYSROOT LEAN_CC LEAN_AR LEAN_GITHASH LAKE LAKE_HOME \
+      LAKE_OVERRIDE_LEAN LAKE_PKG_URL_MAP LAKE_RESTORE_ARTIFACTS ELAN ELAN_HOME ELAN_TOOLCHAIN
+if [ "$USE_MATHLIB_CACHE" != 1 ]; then
+  # From source means no prebuilt artifact enters the build. `--no-cache` only stops downloads:
+  # this Lake also restores modules from a local artifact cache by default (~/.cache/lake or an
+  # elan toolchain cache), which may hold artifacts built elsewhere. Turn that off and keep any
+  # cache directory Lake touches inside WORK. (Comparator's fake shim passes these on to its own
+  # `lake build`; a real landrun sandbox passes only PATH, HOME and LEAN_ABORT_ON_PANIC.)
+  export LAKE_NO_CACHE=1 LAKE_ARTIFACT_CACHE=false LAKE_CACHE_DIR=$WORK/lake-cache
+fi
 
 # ---------------------------------------------------------------- fetch
 fetch_lean() {
@@ -83,7 +168,9 @@ fetch_lean() {
   local h; h=$(sha256sum "$zip" | cut -d' ' -f1)
   [ "$h" = "$LEAN_ZIP_SHA256" ] || die "Lean release zip sha256 $h differs from the audited $LEAN_ZIP_SHA256"
   if [ ! -x "$LEANBIN/lean" ]; then
-    python3 - "$zip" "$TOOLS" <<'PY'
+    # -I everywhere: never import Python modules from the current directory (it may be the
+    # downloaded project) or from user site-packages.
+    python3 -I - "$zip" "$TOOLS" <<'PY'
 import os, sys, zipfile
 z = zipfile.ZipFile(sys.argv[1])
 for info in z.infolist():
@@ -95,6 +182,7 @@ PY
   fi
   "$LEANBIN/lean" --version | tee "$RESULTS/lean-version.txt" >&2
   grep -q "$LEAN_COMMIT" "$RESULTS/lean-version.txt" || die "unexpected Lean commit"
+  record "Lean $LEAN_VERSION release: zip SHA-256 and commit" "PASS"
 }
 
 fetch_repo() {
@@ -115,7 +203,8 @@ fetch_repo() {
 
 fetch_deps() {
   mkdir -p "$PROJ/.lake/packages"
-  python3 - "$PROJ/lake-manifest.json" >"$WORK/deps.tsv" <<'PY'
+  : >"$RESULTS/dependencies.txt"
+  python3 -I - "$PROJ/lake-manifest.json" >"$WORK/deps.tsv" <<'PY'
 import json, sys
 for p in json.load(open(sys.argv[1]))["packages"]:
     print("\t".join([p["name"], p["url"], p["rev"]]))
@@ -163,6 +252,9 @@ build_tools() {
     (cd "$TOOLS/nanoda_lib" && cargo build --release)
     echo "$TOOLS/nanoda_lib/target/release/nanoda_bin" >"$TOOLS/NANODA"
     record "second kernel" "nanoda $(git -C "$TOOLS/nanoda_lib" rev-parse --short HEAD)"
+  elif [ "$NANODA" = 0 ]; then
+    rm -f "$TOOLS/NANODA"
+    record "second kernel" "NOT RUN (NANODA=0)"
   else
     rm -f "$TOOLS/NANODA"
     record "second kernel" "NOT RUN (no cargo; set NANODA=1 after installing Rust)"
@@ -171,11 +263,11 @@ build_tools() {
 
 build() {
   lean_env
-  { echo "host $(hostname)  cpus $(nproc)  mem $(free -g | awk '/Mem:/{print $2}')G  kernel $(uname -r)"; date -u; } >"$RESULTS/machine.txt"
   if [ "$USE_MATHLIB_CACHE" = 1 ]; then
     timed "Mathlib binary cache download (trusted cache)" "$RESULTS/mathlib-cache.log" lake exe cache get
     timed "build Mathlib (on top of cache)" "$RESULTS/build-mathlib.log" lake build +Mathlib
   else
+    record "Lake build caches" "none (no downloads, no local artifact cache)"
     timed "build Mathlib from source (no cache)" "$RESULTS/build-mathlib.log" lake build --no-cache +Mathlib
   fi
   timed "build Comparator and lean4export" "$RESULTS/build-tools.log" lake build --no-cache @Comparator/comparator @lean4export/lean4export
@@ -192,7 +284,7 @@ comparator_run() { # comparator_run <name> <config>
     export COMPARATOR_NANODA; COMPARATOR_NANODA=$(cat "$nanoda_file")
   else
     # Same challenge, theorems and axioms; only the nanoda flag is dropped (recorded in SUMMARY).
-    python3 - "$cfg" "$RESULTS/$name.no-nanoda.json" <<'PY'
+    python3 -I - "$cfg" "$RESULTS/$name.no-nanoda.json" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1])); c.pop("enable_nanoda", None)
 json.dump(c, open(sys.argv[2], "w"), indent=2)
@@ -204,13 +296,14 @@ PY
 }
 
 check_axioms() {
-  local f out rc=0
+  local f out rc=0 kept label="main theorems use only propext/choice/Quot.sound"
+  if kept=$(kept_result "$label"); then log "kept from an earlier run: $label: $kept"; return 0; fi
   for f in PrintAxiomsNavierStokes PrintAxiomsEuler; do
     out=$RESULTS/$f.txt
     timed "#print axioms ($f)" "$out" lake env lean "$HERE/$f.lean" || rc=1
   done
   # Every main theorem must depend on exactly {propext, Classical.choice, Quot.sound}.
-  python3 - "$RESULTS" "$MAIN_THEOREMS" <<'PY' || rc=1
+  python3 -I - "$RESULTS" "$MAIN_THEOREMS" <<'PY' || rc=1
 import re, sys, pathlib
 text = "".join(p.read_text() for p in pathlib.Path(sys.argv[1]).glob("PrintAxioms*.txt"))
 ok = True
@@ -222,7 +315,7 @@ for thm in sys.argv[2].split():
     print(("PASS " if good else "FAIL ") + thm + " axioms=" + (", ".join(sorted(got)) if got else "NOT FOUND"))
 sys.exit(0 if ok else 1)
 PY
-  [ $rc -eq 0 ] && record "main theorems use only propext/choice/Quot.sound" "PASS" || record "main theorems use only propext/choice/Quot.sound" "FAIL"
+  if [ $rc -eq 0 ]; then record "$label" "PASS"; else record "$label" "FAIL"; fi
 }
 
 static_scan() {
@@ -234,17 +327,75 @@ static_scan() {
     printf '%-24s %6d\n' "$pat" "$n" >>"$out"
   done
   # In the solution trees only docstring mentions are expected; any code-level hit must be inspected.
-  record "static scan of NavierStokes/ and Euler/" "written (inspect static-scan.txt)"
+  record_once "static scan of NavierStokes/ and Euler/" "written (inspect static-scan.txt)"
+}
+
+leanchecker_threads() { # min(CPUs, GB of RAM / 12), at least 1
+  local n; n=$(awk '/^MemTotal:/{print int($2 / 1048576 / 12)}' /proc/meminfo)
+  [ "$n" -le "$(nproc)" ] || n=$(nproc)
+  [ "$n" -ge 1 ] || n=1
+  echo "$n"
+}
+
+leanchecker_parts() { # leanchecker_parts <n>: the built NavierStokes.* and Euler.* modules as lines of
+  # leanchecker arguments, about <n> modules per line. leanchecker takes module-name prefixes, so a
+  # module with submodules (NavierStokes.R3) is named once and stands for its subtree. The library
+  # roots NavierStokes and Euler are left out: their files contain only imports.
+  python3 -I - "$PROJ/.lake/build/lib/lean" "$1" <<'PY'
+import pathlib, sys
+lib, size = pathlib.Path(sys.argv[1]), int(sys.argv[2])
+mods = sorted(".".join(p.relative_to(lib).parts)[:-len(".olean")]
+              for top in ("NavierStokes", "Euler") if (lib / top).is_dir()
+              for p in (lib / top).rglob("*.olean"))
+names = set(mods)
+def root(m):  # the shortest module that m lies under (m itself if none)
+    parts = m.split(".")
+    return next(".".join(parts[:i]) for i in range(2, len(parts) + 1) if ".".join(parts[:i]) in names)
+count = {}
+for m in mods:
+    count[root(m)] = count.get(root(m), 0) + 1
+line, n = [], 0
+for r in sorted(count):
+    if line and n + count[r] > size:
+        print(" ".join(line))
+        line, n = [], 0
+    line.append(r)
+    n += count[r]
+if line:
+    print(" ".join(line))
+PY
 }
 
 check() {
   lean_env
   [ -f "$TOOLS/LANDRUN" ] || die "run '$0 build' first"
+  # The check may run on a different machine from the build: record the sandbox where Comparator runs.
+  record_once "sandbox on this machine" "$(basename "$(cat "$TOOLS/LANDRUN")"); Landlock active: $(landlock_active && echo yes || echo no)"
   comparator_run NavierStokes ComparatorChallenges/NavierStokes.json || true
   comparator_run Euler ComparatorChallenges/Euler.json || true
   check_axioms || true
-  timed "leanchecker: replay every NavierStokes.* and Euler.* module" "$RESULTS/leanchecker-modules.log" \
-    lake env leanchecker NavierStokes Euler || true
+  # Lean maps each .olean at a fixed address; a second concurrent import of the same file in one
+  # process is read into the heap instead. Parallel replays therefore each hold a private copy.
+  local lct=${LEANCHECKER_THREADS:-$(leanchecker_threads)}
+  log "leanchecker: $lct modules at a time"
+  if [ "$LEANCHECKER_PART" -gt 0 ]; then
+    local k=0 parts roots
+    # A resumed check keeps the parts it started with, so that "part k of n" always names the same modules.
+    if ! resuming || [ ! -s "$RESULTS/leanchecker-parts.txt" ]; then
+      leanchecker_parts "$LEANCHECKER_PART" >"$RESULTS/leanchecker-parts.txt"
+    fi
+    parts=$(($(wc -l <"$RESULTS/leanchecker-parts.txt")))
+    [ "$parts" -gt 0 ] || record_once "leanchecker: replay modules" "FAIL no built NavierStokes.* or Euler.* module found"
+    while IFS= read -r roots <&3; do
+      k=$((k + 1))
+      # shellcheck disable=SC2086  # one argument per module name
+      timed "leanchecker: replay modules, part $k of $parts" "$RESULTS/leanchecker-modules-$k.log" \
+        env LEAN_NUM_THREADS="$lct" lake env leanchecker $roots || true
+    done 3<"$RESULTS/leanchecker-parts.txt"
+  else
+    timed "leanchecker: replay every NavierStokes.* and Euler.* module" "$RESULTS/leanchecker-modules.log" \
+      env LEAN_NUM_THREADS="$lct" lake env leanchecker NavierStokes Euler || true
+  fi
   timed "leanchecker --fresh NavierStokes.ComparatorSolution (whole env)" "$RESULTS/leanchecker-fresh-ns.log" \
     lake env leanchecker --fresh NavierStokes.ComparatorSolution || true
   timed "leanchecker --fresh Euler.Solution (whole env)" "$RESULTS/leanchecker-fresh-euler.log" \
@@ -255,9 +406,11 @@ check() {
 }
 
 case "${1:-all}" in
-  fetch) fetch_lean; fetch_repo; fetch_deps ;;
-  build) build ;;
-  check) check ;;
-  all)   fetch_lean; fetch_repo; fetch_deps; build; check ;;
+  fetch) begin fetch; fetch_lean; fetch_repo; fetch_deps; end_stage ;;
+  build) begin build; build; end_stage ;;
+  check) begin check; check; end_stage ;;
+  all)   begin fetch; fetch_lean; fetch_repo; fetch_deps; end_stage
+         begin build; build; end_stage
+         begin check; check; end_stage ;;
   *) echo "usage: $0 [fetch|build|check|all]" >&2; exit 2 ;;
 esac

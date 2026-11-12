@@ -11,4 +11,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python verify/identities.py
       - run: pytest -q
-      - run: bash -n audit/scan_lean_repo.sh audit/fetch_and_diff.sh
+      # `bash -n a b` would check only `a` (b becomes an argument), so check each script on its own.
+      - run: |
+          for f in audit/scan_lean_repo.sh audit/fetch_and_diff.sh audit/kernel-check/kernel_check.sh \
+                   audit/kernel-check/fasrc.sbatch audit/kernel-check/submit_fasrc.sh \
+                   audit/kernel-check/github_slot.sh; do bash -n "$f"; done

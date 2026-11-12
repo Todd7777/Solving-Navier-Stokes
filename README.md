@@ -34,7 +34,7 @@ in full, verified by machine, or marked as someone else's claim with its evidenc
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-pytest -q
+python -m pytest -q
 ```
 
 ```bash
@@ -43,7 +43,9 @@ audit/fetch_and_diff.sh /tmp/ns-audit
 ```
 
 Rebuilding the Lean proof itself needs the Lean toolchain and the Mathlib cache; the exact commands are in
-`docs/03-audit-openai-lean-formalization.md`, Section 7.
+`docs/03-audit-openai-lean-formalization.md`, Section 7. `audit/kernel-check/` automates the rebuild, with Mathlib
+built from source, and the kernel checks of (C)/(D). It runs as SLURM jobs on Harvard's FASRC cluster or,
+experimentally, as chained jobs on GitHub's free runners; see its README. Neither route has run yet.
 
 ## The short version of the argument
 

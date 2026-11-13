@@ -1,0 +1,6 @@
+host runnervm8axu0  cpus 4  mem 15G  kernel 7.0.0-1017-azure  Landlock yes
+Thu Nov 12 17:58:44 UTC 2026
+host runnervm7aw5e  cpus 4  mem 15G  kernel 7.0.0-1017-azure  Landlock yes
+Thu Nov 12 19:53:24 UTC 2026
+host runnervm7aw5e  cpus 4  mem 15G  kernel 7.0.0-1017-azure  Landlock yes
+Fri Nov 13 00:56:30 UTC 2026

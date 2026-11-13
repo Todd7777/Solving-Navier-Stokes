@@ -1,0 +1,42 @@
+2026-11-12T15:06:11Z stage fetch on runnervm8axu0
+2026-11-12T15:07:14Z stage fetch complete
+2026-11-12T15:07:14Z stage build on runnervm8axu0
+2026-11-12T15:07:14Z start: build Mathlib from source (no cache)
+2026-11-12T17:58:20Z start: build Comparator and lean4export
+2026-11-12T17:58:44Z stage build complete
+2026-11-12T17:58:44Z stage check on runnervm8axu0, resuming (RESUME_CHECK=all)
+2026-11-12T17:58:44Z start: Comparator: NavierStokes (statement match, axioms, kernel replay)
+2026-11-12T18:36:20Z start: Comparator: Euler (statement match, axioms, kernel replay)
+2026-11-12T19:48:19Z out of time, not starting: #print axioms (PrintAxiomsNavierStokes)
+2026-11-12T19:53:24Z stage check on runnervm7aw5e, resuming (RESUME_CHECK=all)
+2026-11-12T19:53:24Z kept from an earlier run: Comparator: NavierStokes (statement match, axioms, kernel replay): PASS (2256 s)
+2026-11-12T19:53:24Z kept from an earlier run: Comparator: Euler (statement match, axioms, kernel replay): PASS (4319 s)
+2026-11-12T19:53:24Z start: #print axioms (PrintAxiomsNavierStokes)
+2026-11-12T19:53:42Z start: #print axioms (PrintAxiomsEuler)
+2026-11-12T19:53:50Z leanchecker: 1 modules at a time
+2026-11-12T19:53:50Z start: leanchecker: replay modules, part 1 of 9
+2026-11-12T20:32:35Z start: leanchecker: replay modules, part 2 of 9
+2026-11-12T21:10:49Z start: leanchecker: replay modules, part 3 of 9
+2026-11-12T21:49:11Z start: leanchecker: replay modules, part 4 of 9
+2026-11-12T22:27:33Z start: leanchecker: replay modules, part 5 of 9
+2026-11-12T23:06:14Z start: leanchecker: replay modules, part 6 of 9
+2026-11-12T23:44:15Z start: leanchecker: replay modules, part 7 of 9
+2026-11-13T00:21:26Z start: leanchecker: replay modules, part 8 of 9
+2026-11-13T00:56:30Z stage check on runnervm7aw5e, resuming (RESUME_CHECK=all)
+2026-11-13T00:56:30Z kept from an earlier run: Comparator: NavierStokes (statement match, axioms, kernel replay): PASS (2256 s)
+2026-11-13T00:56:30Z kept from an earlier run: Comparator: Euler (statement match, axioms, kernel replay): PASS (4319 s)
+2026-11-13T00:56:30Z kept from an earlier run: main theorems use only propext/choice/Quot.sound: PASS
+2026-11-13T00:56:30Z leanchecker: 1 modules at a time
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 1 of 9: PASS (2325 s)
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 2 of 9: PASS (2294 s)
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 3 of 9: PASS (2302 s)
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 4 of 9: PASS (2302 s)
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 5 of 9: PASS (2321 s)
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 6 of 9: PASS (2280 s)
+2026-11-13T00:56:30Z kept from an earlier run: leanchecker: replay modules, part 7 of 9: PASS (2231 s)
+2026-11-13T00:56:30Z start: leanchecker: replay modules, part 8 of 9
+2026-11-13T01:33:30Z start: leanchecker: replay modules, part 9 of 9
+2026-11-13T01:38:22Z start: leanchecker --fresh NavierStokes.ComparatorSolution (whole env)
+2026-11-13T02:16:32Z start: leanchecker --fresh Euler.Solution (whole env)
+2026-11-13T02:57:57Z done; results in /home/runner/kc-work/results
+2026-11-13T02:57:57Z stage check complete

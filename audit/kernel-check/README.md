@@ -4,7 +4,8 @@ This directory contains a self-contained job that rebuilds OpenAI's Lean develop
 (`github.com/openai/NavierStokesAndEuler` at the audited commit `f9e8bc5`) **from source**,
 including Mathlib, and checks it three independent ways. It is the one step of the audit in
 `docs/03-audit-openai-lean-formalization.md` that could not be run inside the cloud session that
-wrote it (see "Why this was not run here" below).
+wrote it (see "Why this was not run here" below). It has since run in full on GitHub's runners, on
+12–13 November 2026, and every check passed: see `audit/results/kernel-check-2026-11-13/`.
 
 | file | purpose |
 |---|---|
@@ -45,8 +46,10 @@ Comparator runs. Only Mathlib and the checking tools are built first.
   line in `docs/03`, Section 3, with one caveat about the periodic-pressure erratum.
 * The sandbox, only if the solution could attack the build. Comparator calls `landrun --best-effort`, which
   silently runs **without** isolation on kernels lacking Landlock (Linux < 5.13). The job records whether
-  Landlock was active. The static scan shows the solution defines no metaprograms (no `elab`, `macro_rules`,
-  `initialize`, `#eval`, `run_cmd`), so compiling it runs only Mathlib's and Lean's own tactics.
+  Landlock was active. Comparator's README further asks for a `systemd-run` guard against a landrun vulnerability
+  that Linux 7.1 fixes, and for an unprivileged user; this script provides neither. The static scan shows the
+  solution defines no metaprograms (no `elab`, `macro_rules`, `initialize`, `#eval`, `run_cmd`), so compiling it runs
+  only Mathlib's and Lean's own tactics.
 
 Mathlib is compiled from source by default, which removes the "trust the binary cache" assumption that the
 Comparator README mentions. With this Lake (4.34) `lake build --no-cache` is not enough on its own: it stops
@@ -89,7 +92,9 @@ audit/kernel-check/submit_fasrc.sh                     # submits them
 | build | `sapphire` | 64 | 256 GB | 8 h | Mathlib from source: 2.30 million lines in 8,370 files at the pinned commit |
 | check | `sapphire` | 16 | 256 GB | 2 days | builds the solution (0.64 million lines, 2,655 files), then long single-threaded kernel replays |
 
-Only the fetch figures are measured; nothing has been built on Cannon yet. Lean sizes its thread pools by the CPUs of
+Only the fetch figures are measured, in a cloud session; nothing has been built on Cannon yet. For scale, on GitHub's
+runners (4 CPUs, 16 GB) the Mathlib build took 2 h 51 min and the check steps 8 h 19 min, replaying one module at a
+time, and nothing ran out of memory (`audit/results/kernel-check-2026-11-13/`). Lean sizes its thread pools by the CPUs of
 the node, not of the job, so the job sets `LEAN_NUM_THREADS` to its CPU count. `leanchecker NavierStokes Euler` replays
 modules in parallel, and each replay reads its own copy of the `.olean` files it imports (Lean maps a file at a fixed
 address only once per process), so the job runs one replay per 12 GB of memory (`LEANCHECKER_THREADS`).
@@ -136,18 +141,24 @@ gh workflow run kernel-check.yml
 Each slot's `results/` is an artifact (`results-slot-NN-attempt-M`). The final `report` job shows the latest
 `SUMMARY.txt` and fails unless the check finished with `OVERALL` PASS.
 
-What to expect (an estimate; it has not been run yet). Fetch and the Mathlib build should finish in a few slots. The
-check replays one module at a time and splits `leanchecker NavierStokes Euler` into parts of about 300 modules, so that
-each part fits in a slot (`LEANCHECKER_PART`). A step cut off by a slot's time limit starts again in the next slot, at
-most three times, and is then recorded as `FAIL not finished`. A step killed for memory (`rc=137`) is recorded and not
-retried. Comparator is the likeliest case, since it holds the whole exported proof in memory. On a 16 GB runner either
-outcome is a limit of the runner, not a finding about the proof. The nanoda kernel is off by default for the same reason.
+The check replays one module at a time and splits `leanchecker NavierStokes Euler` into parts of about 300 modules, so
+that each part fits in a slot (`LEANCHECKER_PART`). A step cut off by a slot's time limit starts again in the next slot,
+at most three times, and is then recorded as `FAIL not finished`. A step killed for memory (`rc=137`) is recorded and not
+retried. On a 16 GB runner either outcome is a limit of the runner, not a finding about the proof. The nanoda kernel is
+off by default for the same reason.
+
+The first full run (run 43243527940, 12–13 November 2026) took three slots and 11 h 55 min. Slot 01 fetched, built
+Mathlib in 2 h 51 min, and ran both Comparator checks (38 min and 1 h 12 min). Slot 02 ran `#print axioms` and seven
+`leanchecker` parts of about 38 minutes each. Slot 03 reran the part that slot 02's time limit had cut off, then ran the
+last part and the two `--fresh` replays (38 and 41 min). Nothing ran out of memory, Comparator included, and every
+check passed. The results are in `audit/results/kernel-check-2026-11-13/`.
 
 Trust: the build is still from source, but GitHub's runners and its cache, which carries the build from slot to slot,
 join the trusted base. A runner's kernel may offer Landlock, in which case Comparator runs inside real landrun;
-`SUMMARY.txt` records which sandbox ran. "Re-run failed jobs" on a failed slot resumes from what that slot saved. A run
-fills most of the repository's 10 GB Actions cache; the last entry expires after 7 days unused, or can be deleted
-under Actions > Caches.
+`SUMMARY.txt` records which sandbox ran. On 12–13 November the runners had Linux 7.0 with Landlock, and the runner
+account could use `sudo` without a password (see "Trust that remains after a PASS"). "Re-run failed jobs" on a failed
+slot resumes from what that slot saved. A run fills most of the repository's 10 GB Actions cache; the last entry
+expires after 7 days unused, or can be deleted under Actions > Caches.
 
 ## Results
 
@@ -179,3 +190,6 @@ written to be run where that is allowed and fast.
 On 9 November 2026 a later cloud session ran the fetch stage again, through `fasrc.sbatch` and into an empty
 directory: every hash and revision matched, and the network policy blocked no host. That session did not build or
 check either; the SLURM jobs above exist for that.
+
+On 12–13 November 2026 the GitHub Actions route ran all three stages, and every check passed. See "On GitHub Actions"
+above and `audit/results/kernel-check-2026-11-13/`.

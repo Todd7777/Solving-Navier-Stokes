@@ -1,0 +1,28 @@
+Lean 4.34.0-rc2 release: zip SHA-256 and commit            PASS
+audited files match frozen SHA-256 hashes                  PASS
+DeepMind reference fetched, diff written                   PASS
+all lake dependencies at pinned revisions                  PASS
+Lake build caches                                          none (no downloads, no local artifact cache)
+build Mathlib from source (no cache)                       PASS (10266 s)
+build Comparator and lean4export                           PASS (10 s)
+sandbox                                                    landrun ec104f6; Landlock active: yes
+second kernel                                              NOT RUN (NANODA=0)
+sandbox on this machine                                    landrun; Landlock active: yes
+Comparator: NavierStokes (statement match, axioms, kernel replay) PASS (2256 s)
+Comparator: Euler (statement match, axioms, kernel replay) PASS (4319 s)
+#print axioms (PrintAxiomsNavierStokes)                    PASS (18 s)
+#print axioms (PrintAxiomsEuler)                           PASS (8 s)
+main theorems use only propext/choice/Quot.sound           PASS
+leanchecker: replay modules, part 1 of 9                   PASS (2325 s)
+leanchecker: replay modules, part 2 of 9                   PASS (2294 s)
+leanchecker: replay modules, part 3 of 9                   PASS (2302 s)
+leanchecker: replay modules, part 4 of 9                   PASS (2302 s)
+leanchecker: replay modules, part 5 of 9                   PASS (2321 s)
+leanchecker: replay modules, part 6 of 9                   PASS (2280 s)
+leanchecker: replay modules, part 7 of 9                   PASS (2231 s)
+leanchecker: replay modules, part 8 of 9                   PASS (2220 s)
+leanchecker: replay modules, part 9 of 9                   PASS (292 s)
+leanchecker --fresh NavierStokes.ComparatorSolution (whole env) PASS (2290 s)
+leanchecker --fresh Euler.Solution (whole env)             PASS (2484 s)
+static scan of NavierStokes/ and Euler/                    written (inspect static-scan.txt)
+OVERALL                                                    PASS

@@ -23,13 +23,17 @@
 #                         adds trust in the cache, see Comparator README). Default 0.
 #   SANDBOX=auto|landrun|fake   landrun needs Go >= 1.24 and Landlock (Linux >= 5.13);
 #                         'fake' uses Comparator's own unsandboxed shim. Default auto.
-#   NANODA=auto|1|0       build/run the nanoda second kernel (needs cargo). Default auto.
+#   NANODA=auto|1|0       the nanoda second kernel, at the pinned NANODA_COMMIT: fetch downloads its
+#                         source and locked crates, build compiles it offline, and Comparator runs it.
+#                         Needs Rust's cargo for fetch and build. 1 stops at once without cargo;
+#                         auto uses nanoda if cargo is on PATH. Default auto.
 #   LEAN_ZIP_PATH=/path   reuse an already-downloaded copy of the Lean release zip.
 #   LEAN_NUM_THREADS=n    worker threads of Lake, Comparator and leanchecker. Lean's default is
 #                         every CPU of the machine, not the CPUs a batch job was given.
 #   LEANCHECKER_THREADS=n modules replayed at once by `leanchecker NavierStokes Euler`. Each
 #                         replay reads its own copy of the .olean files it imports (most of
-#                         Mathlib), so memory is the limit. Default min(CPUs, GB of RAM / 12).
+#                         Mathlib), so memory is the limit. Default min(CPUs, GB of RAM / 16): one
+#                         replay at a time fit on GitHub's 16 GB runners on 12-13 November 2026.
 #   RESUME_CHECK=1        continue an interrupted or partly failed check: steps already recorded
 #                         as PASS are kept and skipped; everything else runs again. Default 0.
 #   RESUME_CHECK=all      continue an interrupted check: every recorded result, PASS or FAIL, is
@@ -55,6 +59,9 @@ FC_URL=https://raw.githubusercontent.com/google-deepmind/formal-conjectures/8bf4
 FC_SHA256=f446284f2aa54375f558c263a580b34e2e7bc9f44a28829637199cc72257d25d
 LANDRUN_URL=https://github.com/zouuup/landrun.git
 NANODA_URL=https://github.com/ammkrn/nanoda_lib.git
+# nanoda_lib master on 2026-11-07 (version 0.4.32). It reads export format 3.1.0 up to, not including,
+# 3.2.0; the pinned lean4export (cacf989) writes 3.1.0.
+NANODA_COMMIT=0da9f98feadd3a0a2ef4b3dbcf52a298a6fef929
 EXPECTED_HASHES='0cd193b8d5cbd0266e6e2f72e68dd5abcdcf2430ebd435dd9289737e9aa7da61  ComparatorChallenges/NavierStokes.lean
 b11e9bafc220c8126142a9c9281cfeab4872d8f74a7d4899fed206f7f6e1d4f7  ComparatorChallenges/Euler.lean
 7610ecead7b390d80ff7f4229a3ff8f18d630e046f7ad1de4f92c7e8e76845b8  ComparatorChallenges/NavierStokes.json
@@ -82,6 +89,7 @@ MAX_STEP_ATTEMPTS=${MAX_STEP_ATTEMPTS:-0}
 LEANCHECKER_PART=${LEANCHECKER_PART:-0}
 STOP_AT=${STOP_AT:-}
 case $RESUME_CHECK in 0|1|all) ;; *) echo "RESUME_CHECK must be 0, 1 or all" >&2; exit 2 ;; esac
+case $NANODA in auto|0|1) ;; *) echo "NANODA must be auto, 1 or 0" >&2; exit 2 ;; esac
 case $MAX_STEP_ATTEMPTS$LEANCHECKER_PART$STOP_AT in
   *[!0-9]*) echo "MAX_STEP_ATTEMPTS, LEANCHECKER_PART and STOP_AT must be whole numbers" >&2; exit 2 ;;
 esac
@@ -89,6 +97,7 @@ PROJ=$WORK/NavierStokesAndEuler
 TOOLS=$WORK/tools
 LEANBIN=$TOOLS/lean-${LEAN_VERSION}-linux/bin
 RESULTS=$WORK/results
+CARGO_DIR=$WORK/cargo   # CARGO_HOME for nanoda: its crates are downloaded by fetch and reused offline
 mkdir -p "$TOOLS" "$RESULTS/summary"
 LOG=$RESULTS/run.log
 STAGE=none
@@ -225,6 +234,39 @@ PY
   record "all lake dependencies at pinned revisions" "PASS"
 }
 
+# The nanoda second kernel: does this run use it (NANODA=1, or auto with cargo on PATH)?
+nanoda_wanted() { [ "$NANODA" = 1 ] || { [ "$NANODA" = auto ] && command -v cargo >/dev/null 2>&1; }; }
+require_cargo() { # with NANODA=1, stop before any work if fetch or build could not handle nanoda
+  [ "$NANODA" != 1 ] || command -v cargo >/dev/null 2>&1 \
+    || die "NANODA=1 but cargo is not on PATH: install Rust (rustup) and start again, or set NANODA=0"
+}
+# Run cargo and rustc in nanoda's own directory, never in the audited project's: rustup and cargo read
+# toolchain and configuration files (rust-toolchain.toml, .cargo/config.toml) from the current directory.
+in_nanoda() { (cd "$TOOLS/nanoda_lib" && CARGO_HOME=$CARGO_DIR "$@"); }
+nanoda_source() { # the pinned nanoda source, and the crates its Cargo.lock names, inside WORK
+  local d=$TOOLS/nanoda_lib i ok=0
+  if [ "$(git -C "$d" rev-parse HEAD 2>/dev/null)" != "$NANODA_COMMIT" ]; then
+    rm -rf "$d" "$TOOLS/nanoda.crates"
+    mkdir -p "$d"
+    git -C "$d" init -q && git -C "$d" remote add origin "$NANODA_URL"
+    for i in 1 2 3 4 5; do if git -C "$d" fetch -q --depth 1 origin "$NANODA_COMMIT"; then ok=1; break; fi; sleep $((2 ** i)); done
+    [ $ok = 1 ] || die "could not fetch nanoda@$NANODA_COMMIT"
+    git -C "$d" -c advice.detachedHead=false checkout -q FETCH_HEAD
+  fi
+  [ "$(git -C "$d" rev-parse HEAD)" = "$NANODA_COMMIT" ] || die "nanoda is not at the pinned revision $NANODA_COMMIT"
+  [ -z "$(git -C "$d" status --porcelain --untracked-files=no)" ] || die "tracked files of nanoda are modified"
+  if [ ! -f "$TOOLS/nanoda.crates" ]; then
+    in_nanoda cargo fetch --locked >"$RESULTS/nanoda-fetch.log" 2>&1 \
+      || die "could not download nanoda's crates (see nanoda-fetch.log)"
+    : >"$TOOLS/nanoda.crates"
+  fi
+}
+fetch_nanoda() {
+  nanoda_wanted || return 0
+  nanoda_source
+  record "nanoda ${NANODA_COMMIT:0:7}: source and locked crates fetched" "PASS"
+}
+
 # ---------------------------------------------------------------- build (trusted part only)
 lean_env() { export PATH="$LEANBIN:$PATH"; cd "$PROJ"; }
 
@@ -245,13 +287,12 @@ build_tools() {
     echo "$PROJ/.lake/packages/Comparator/scripts/fake-landrun.sh" >"$TOOLS/LANDRUN"
     record "sandbox" "NONE (Comparator fake-landrun shim; Landlock active: $(landlock_active && echo yes || echo no))"
   fi
-  local want=$NANODA
-  if [ "$want" = auto ]; then if command -v cargo >/dev/null 2>&1; then want=1; else want=0; fi; fi
-  if [ "$want" = 1 ]; then
-    [ -d "$TOOLS/nanoda_lib/.git" ] || git clone -q --depth 1 "$NANODA_URL" "$TOOLS/nanoda_lib"
-    (cd "$TOOLS/nanoda_lib" && cargo build --release)
+  if nanoda_wanted; then
+    nanoda_source   # a no-op when the fetch stage has already downloaded it
+    timed "build nanoda ${NANODA_COMMIT:0:7} (cargo --frozen, offline)" "$RESULTS/build-nanoda.log" \
+      in_nanoda cargo build --release --frozen || die "nanoda did not build (see build-nanoda.log)"
     echo "$TOOLS/nanoda_lib/target/release/nanoda_bin" >"$TOOLS/NANODA"
-    record "second kernel" "nanoda $(git -C "$TOOLS/nanoda_lib" rev-parse --short HEAD)"
+    record "second kernel" "nanoda ${NANODA_COMMIT:0:7}, $(in_nanoda rustc --version 2>/dev/null || echo 'rustc version unknown')"
   elif [ "$NANODA" = 0 ]; then
     rm -f "$TOOLS/NANODA"
     record "second kernel" "NOT RUN (NANODA=0)"
@@ -263,6 +304,7 @@ build_tools() {
 
 build() {
   lean_env
+  build_tools   # landrun and nanoda first: a problem with them shows in minutes, not after Mathlib
   if [ "$USE_MATHLIB_CACHE" = 1 ]; then
     timed "Mathlib binary cache download (trusted cache)" "$RESULTS/mathlib-cache.log" lake exe cache get
     timed "build Mathlib (on top of cache)" "$RESULTS/build-mathlib.log" lake build +Mathlib
@@ -271,7 +313,6 @@ build() {
     timed "build Mathlib from source (no cache)" "$RESULTS/build-mathlib.log" lake build --no-cache +Mathlib
   fi
   timed "build Comparator and lean4export" "$RESULTS/build-tools.log" lake build --no-cache @Comparator/comparator @lean4export/lean4export
-  build_tools
 }
 
 # ---------------------------------------------------------------- check
@@ -330,8 +371,8 @@ static_scan() {
   record_once "static scan of NavierStokes/ and Euler/" "written (inspect static-scan.txt)"
 }
 
-leanchecker_threads() { # min(CPUs, GB of RAM / 12), at least 1
-  local n; n=$(awk '/^MemTotal:/{print int($2 / 1048576 / 12)}' /proc/meminfo)
+leanchecker_threads() { # min(CPUs, GB of RAM / 16), at least 1
+  local n; n=$(awk '/^MemTotal:/{print int($2 / 1048576 / 16)}' /proc/meminfo)
   [ "$n" -le "$(nproc)" ] || n=$(nproc)
   [ "$n" -ge 1 ] || n=1
   echo "$n"
@@ -369,6 +410,7 @@ PY
 check() {
   lean_env
   [ -f "$TOOLS/LANDRUN" ] || die "run '$0 build' first"
+  [ "$NANODA" != 1 ] || [ -f "$TOOLS/NANODA" ] || die "NANODA=1 but nanoda was not built: run the build stage with NANODA=1"
   # The check may run on a different machine from the build: record the sandbox where Comparator runs.
   record_once "sandbox on this machine" "$(basename "$(cat "$TOOLS/LANDRUN")"); Landlock active: $(landlock_active && echo yes || echo no)"
   comparator_run NavierStokes ComparatorChallenges/NavierStokes.json || true
@@ -406,10 +448,10 @@ check() {
 }
 
 case "${1:-all}" in
-  fetch) begin fetch; fetch_lean; fetch_repo; fetch_deps; end_stage ;;
-  build) begin build; build; end_stage ;;
+  fetch) begin fetch; require_cargo; fetch_lean; fetch_repo; fetch_deps; fetch_nanoda; end_stage ;;
+  build) begin build; require_cargo; build; end_stage ;;
   check) begin check; check; end_stage ;;
-  all)   begin fetch; fetch_lean; fetch_repo; fetch_deps; end_stage
+  all)   begin fetch; require_cargo; fetch_lean; fetch_repo; fetch_deps; fetch_nanoda; end_stage
          begin build; build; end_stage
          begin check; check; end_stage ;;
   *) echo "usage: $0 [fetch|build|check|all]" >&2; exit 2 ;;

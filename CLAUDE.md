@@ -24,7 +24,7 @@ Unforced global regularity, statements (A) and (B), is open, and this repository
 ```bash
 pip install -r requirements.txt
 python verify/identities.py
-python -m pytest -q   # 2026-11-13: 25 pass
+python -m pytest -q   # 2026-11-14: 30 pass
 ```
 
 In the cloud environment `pytest` on PATH can be a uv tool without numpy or sympy, which fails at collection;
@@ -45,10 +45,15 @@ In the cloud environment `pytest` on PATH can be a uv tool without numpy or symp
   about (A) or (B), nor about whether the Lean statements are (C) and (D) (`docs/03`, Section 3).
 - The first GitHub run (2026-11-12) stopped at once because `github_slot.sh` lacked its executable bit (fixed in
   `15cbf09`). Comparator fit in 16 GB. Runners had a 145 GB disk with 118 GB free after cleanup.
-- FASRC: the fetch stage passed in a cloud session on 2026-11-09; build and check have not run on Cannon. The
-  README's Fairshare note says how to keep the cost down, and the GitHub timings are a basis for sizing.
+- FASRC: the fetch stage passed in a cloud session on 2026-11-09; build and check have not run on Cannon. A second
+  run with the nanoda kernel is ready to submit: `submit_fasrc.sh --nanoda` (Rust via rustup; README, "With the
+  nanoda second kernel"). nanoda is pinned to `0da9f98`, whose format range includes lean4export's 3.1.0; fetch
+  downloads it and its locked crates (checked in a cloud session), and the build compiles it offline before
+  Mathlib. Compiling and running nanoda are untested. Requests were resized from the GitHub timings: build 32 CPUs,
+  128 GB, 4 h; check 8 CPUs, 128 GB, 2 days, with one `leanchecker` replay per 16 GB.
 
 ## Where the next steps are
 
 `docs/05-why-A-and-B-are-open.md` and the audit checklist in `docs/06-failed-claims-and-audit-checklist.md`.
-For the kernel check: a second run off GitHub with the nanoda kernel, for example on FASRC (`docs/03`, Section 9).
+For the kernel check: a second run off GitHub with the nanoda kernel, on FASRC with `submit_fasrc.sh --nanoda`
+(`docs/03`, Section 9).

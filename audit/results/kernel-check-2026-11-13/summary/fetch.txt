@@ -1,0 +1,4 @@
+Lean 4.34.0-rc2 release: zip SHA-256 and commit            PASS
+audited files match frozen SHA-256 hashes                  PASS
+DeepMind reference fetched, diff written                   PASS
+all lake dependencies at pinned revisions                  PASS

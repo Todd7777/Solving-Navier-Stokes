@@ -1,9 +1,9 @@
 # Audit of the OpenAI Lean formalization of Clay statements (C) and (D)
 
 Audited: `https://github.com/openai/NavierStokesAndEuler`, commit `f9e8bc5b38b6e212696e8a30e3e91517af887bbd`
-(author recorded in git as Boris Alexeev, 2026-09-10 07:51:24 -0400). Audit date: 5 November 2026.
-Inputs are frozen with SHA-256 hashes in `audit/reference/`; the scripts that produced every number below are in
-`audit/`, and their output from today is in `audit/results/`.
+(author recorded in git as Boris Alexeev, 2026-09-10 07:51:24 -0400). Audit date: 5 November 2026; kernel check
+12–13 November 2026 (Section 7). Inputs are frozen with SHA-256 hashes in `audit/reference/`; the scripts that
+produced every number below are in `audit/`, and their outputs are in `audit/results/`.
 
 ## 0. Verdict in five lines
 
@@ -13,9 +13,10 @@ Inputs are frozen with SHA-256 hashes in `audit/reference/`; the scripts that pr
    statements (Section 4: the only differences are imports, namespace, attributes and docstrings).
 3. The 641 k-line proof development declares no axioms and contains no `sorry` outside the four intentional challenge
    placeholders; no `native_decide`, `implemented_by`, `unsafe`, `opaque`, `partial`, or `set_option` anywhere (Section 5).
-4. I could **not** rebuild it here: the Lean release and Mathlib cache servers are outside this sandbox's network policy.
-   The kernel check therefore rests on OpenAI's own report and on whoever has run `lake build`/Comparator since. Exact
-   reproduction commands are in Section 7.
+4. **Machine-checked**, 12–13 November 2026: rebuilt here from source, Mathlib included, on GitHub's runners, and
+   passed by Comparator (same statements; only `propext`, `Quot.sound`, `Classical.choice`; Lean-kernel replay), by
+   `#print axioms` and by `leanchecker` (Section 7). Caveats: Lean's kernel only (nanoda not run), a sandbox short of
+   two of Comparator's assumptions, and GitHub's runners and cache in the trusted base.
 5. None of this bears on (A)/(B), which remain open. The published critique of the manuscript (Section 8) does not
    challenge the formal theorem; it challenges the manuscript as a human-readable proof.
 
@@ -25,7 +26,7 @@ Inputs are frozen with SHA-256 hashes in `audit/reference/`; the scripts that pr
 |---|---|
 | toolchain | `leanprover/lean4:v4.34.0-rc2` |
 | Mathlib | `85e3a25e006c35636f0e53b0e9296caca2685bc0` (tag `v4.34.0-rc2`) |
-| Comparator | `19e111e2141cf333c7daff0f64c5f24acc91dd2e` (tag `v4.34.0-rc2`), nanoda second kernel enabled |
+| Comparator | `19e111e2141cf333c7daff0f64c5f24acc91dd2e` (tag `v4.34.0-rc2`), nanoda second kernel enabled in OpenAI's configuration |
 | `NavierStokes/` | 816 files, 429 279 lines, 26 200 `theorem`/`lemma`, 7 497 `def`, 524 `structure` |
 | `Euler/` | 1 839 files, 211 578 lines, 10 632 `theorem`/`lemma`, 3 287 `def` |
 | challenge statements | `ComparatorChallenges/NavierStokes.lean` (sha256 `0cd193b8…`), `ComparatorChallenges/Euler.lean` (`b11e9baf…`) |
@@ -158,7 +159,9 @@ From `audit/results/scan_2026-11-05.txt` (`audit/scan_lean_repo.sh`):
 | imports outside `Mathlib`/`NavierStokes`/`Euler` | none | |
 
 `ComparatorSolution.lean` ends with `#print axioms` for both theorems; `formalization.yaml` records the output as
-`propext`, `Classical.choice`, `Quot.sound` and `sorry_count: 0`. I could not run `#print axioms` myself (Section 7).
+`propext`, `Classical.choice`, `Quot.sound` and `sorry_count: 0`. I could not run `#print axioms` myself on
+5 November. The kernel check of 12–13 November did, on a rebuild from source, and found exactly these three axioms for
+all four main theorems (Section 7).
 
 ## 6. How the proof is organised (what the certificate actually certifies)
 
@@ -192,8 +195,8 @@ and I did not read it; its correctness is exactly what the kernel check certifie
 The sandbox's network policy blocks `release.lean-lang.org` (Lean toolchains), the Mathlib cache hosts, and
 `claymath.org`, `arxiv.org`, `openai.com`. GitHub itself is reachable, so the repository and the DeepMind reference
 were fetched and hashed, but no Lean binary or Mathlib `.olean` cache could be obtained, and compiling Mathlib from
-source on four cores is not feasible in a session. To reproduce the kernel check on an ordinary machine (expect
-several hours and ~10 GB):
+source on four cores is not feasible in a session (a four-core GitHub runner later took 2 h 51 min; see the update of
+13 November below). To reproduce the kernel check on an ordinary machine (expect several hours and ~10 GB):
 
 ```bash
 git clone https://github.com/openai/NavierStokesAndEuler.git
@@ -225,8 +228,40 @@ Harvard's FASRC Cannon cluster. The pinned Lean release is also published on Git
 the job's fetch stage, which downloads every input and checks it against the hashes frozen here, passed on 7 November
 (as recorded in that README) and again on 9 November 2026. On 9 November the challenge statement and the DeepMind
 reference it fetched were byte-identical to the frozen copies, and their diff matched the one behind Section 4. The
-build and check stages have not been run for this audit yet, so the verdict above is unchanged: the kernel check
-still rests on OpenAI's own report and on whoever has run it since.
+build and check stages had not been run for this audit yet, so on 9 November the verdict was unchanged: the kernel
+check still rested on OpenAI's own report and on whoever had run it since.
+
+*Update, 13 November 2026: the kernel check has run.* **Machine-checked.** The GitHub Actions route of
+`audit/kernel-check/` (run 43243527940, this repository at `15cbf09`) rebuilt the development from the pinned sources.
+It compiled Mathlib instead of downloading it, on GitHub-hosted runners with 4 CPUs and 16 GB each. The run took three
+jobs and 11 h 55 min, and every check passed:
+
+| check | result |
+|---|---|
+| inputs: Lean release zip and commit, the eight pinned files, the eleven dependencies, the DeepMind reference | all match the frozen hashes and revisions; the diff against the reference is the one behind Section 4 |
+| Mathlib and its dependencies from source, with no binary or local artifact cache | built: 8,761 jobs in 2 h 51 min |
+| Comparator, Navier–Stokes: `navier_stokes_breakdown_R3`, `…_periodic` | PASS: the challenge's statements, no axioms beyond the permitted three, accepted by the Lean kernel |
+| Comparator, Euler: `euler_breakdown_R3`, `exists_compact_smooth_euler_singularity` | PASS, likewise |
+| `#print axioms`, all four theorems | exactly `propext`, `Classical.choice`, `Quot.sound` |
+| `leanchecker`, each of the 2,438 compiled solution modules | PASS |
+| `leanchecker --fresh` on both solution modules, Lean core and Mathlib included | PASS |
+| static scan of `NavierStokes/` and `Euler/` | no hit for any of 17 escape-hatch and metaprogramming patterns |
+
+Logs, timeline and provenance are in `audit/results/kernel-check-2026-11-13/`. The kernel check no longer rests on
+OpenAI's own report or on the Mathlib binary cache. What it does not settle:
+
+* **One kernel.** nanoda, which OpenAI's configuration enables, was not run. `leanchecker` replays through the same
+  Lean kernel: it catches declarations that bypassed the kernel, not a bug in it.
+* **The sandbox.** Comparator's README asks for a `systemd-run` guard against a landrun vulnerability that Linux 7.1
+  fixes, and for an unprivileged user. The runners had Linux 7.0, the guard was not used, and the runner account has
+  passwordless `sudo`. Both matter only if compiling the solution runs code of its own. The static scan finds none
+  (Section 5), so compiling it runs only Lean's and Mathlib's elaborators and tactics.
+* **GitHub is trusted**, both its runners and the Actions cache that carried the work from job to job. Comparator ran
+  within the first job, from an empty directory; `#print axioms` and `leanchecker` ran on files restored from the cache.
+* **One run.** A second run elsewhere, for example on FASRC with nanoda, would take GitHub out of the trusted base and
+  add an independent kernel.
+* **Faithfulness.** A kernel check cannot tell whether the challenge statements are (C) and (D). That is Section 3,
+  with the caveat in 3.4. Nothing here concerns (A) or (B).
 
 ## 8. The "lost in translation" critique, read carefully
 
@@ -250,9 +285,11 @@ consequences, which the press coverage has tended to blur:
 | risk | status |
 |---|---|
 | challenge file does not mean what it says | audited in Section 3; one documented caveat (3.4) |
-| hidden axioms / escape hatches | none found by static scan; must be confirmed by `#print axioms` and Comparator on a rebuild |
-| tampered Mathlib cache or toolchain | mitigated only by rebuilding from pinned commits on an independent machine |
-| Lean kernel bug | mitigated by the second kernel (nanoda) when Comparator is run with `enable_nanoda` |
+| hidden axioms / escape hatches | none found by static scan; **machine-checked** on the rebuild from source of 12–13 November by Comparator and `#print axioms`: only `propext`, `Quot.sound`, `Classical.choice` (Section 7) |
+| tampered Mathlib cache or toolchain | Mathlib rebuilt from source at the pinned commit with no binary cache; the toolchain is the official release, checked against its pinned SHA-256. GitHub's runners and Actions cache remain in the trusted base (Section 7) |
+| Lean kernel bug | open: only the Lean kernel has checked the proof here; the second kernel (nanoda, Comparator's `enable_nanoda`) was not run |
+| sandbox escape while compiling the solution | the GitHub run fell short of two of Comparator's sandbox assumptions (Section 7); the solution has no metaprograms (Section 5), so compiling it runs no code of its own |
+| a single run | one run, on GitHub; a second, for example on FASRC with nanoda, would take GitHub out of the trusted base |
 | statement faithful but trivially satisfiable | not possible here: (C)/(D) have no definition holes; all definitions are fixed by the challenge |
 | human-readable proof incorrect or non-matching | open (Section 8); irrelevant to the formal theorem, relevant to acceptance |
 | (A)/(B) | untouched and open |
@@ -260,7 +297,8 @@ consequences, which the press coverage has tended to blur:
 ## 10. Bottom line
 
 As a formal claim, (C) and (D) are in the best evidential position any Millennium-problem claim has ever been in:
-a mechanically checked proof of an independently written statement that I have verified, line by line, is the
-official one (modulo the periodic-pressure erratum). As a piece of human mathematics, the result is not yet
+a mechanically checked proof, rebuilt from source and re-checked by this repository on 12–13 November (Section 7), of
+an independently written statement that I have verified, line by line, is the official one (modulo the
+periodic-pressure erratum). As a piece of human mathematics, the result is not yet
 understood, not yet refereed, and not accepted by the Clay Institute. And as an answer to the question most people
 mean — do smooth, unforced, finite-energy Navier–Stokes flows ever blow up? — it says nothing at all.

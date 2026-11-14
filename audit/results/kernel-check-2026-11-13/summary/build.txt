@@ -1,0 +1,5 @@
+Lake build caches                                          none (no downloads, no local artifact cache)
+build Mathlib from source (no cache)                       PASS (10266 s)
+build Comparator and lean4export                           PASS (10 s)
+sandbox                                                    landrun ec104f6; Landlock active: yes
+second kernel                                              NOT RUN (NANODA=0)

@@ -1,0 +1,2 @@
+host runnervm8axu0  cpus 4  mem 15G  kernel 7.0.0-1017-azure  Landlock yes
+Thu Nov 12 15:06:11 UTC 2026

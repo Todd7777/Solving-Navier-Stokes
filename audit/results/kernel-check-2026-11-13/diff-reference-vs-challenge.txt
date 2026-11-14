@@ -1,0 +1,90 @@
+3a4,6
+> This file has been modified from its original form in the Formal Conjectures
+> project.
+> 
+17c20
+< import FormalConjecturesUtil
+---
+> import Mathlib
+21a25,33
+> Standalone comparator copied from:
+> https://github.com/google-deepmind/formal-conjectures/blob/8bf45ed70d48b2b2a501de9c00b26bfa38c573ee/FormalConjectures/Millenium/NavierStokes.lean
+> 
+> The upstream definitions, helper proofs, and breakdown alternatives (C) and (D)
+> are retained, including their intentional `sorry` challenge placeholders. The
+> imports, metadata attributes, namespace, and local notation are adapted for this
+> project. All utility dependencies are inlined; only Mathlib is imported.
+> Neither the proof root nor the submission imports this reference.
+> 
+29d40
+< - [Clay Mathematics Institute](https://www.claymath.org/wp-content/uploads/2022/06/navierstokes.pdf)
+33,36c44
+< The Clay Millennium Problem asks for a proof of one of the following four statements:
+< 
+< - `navier_stokes_existence_and_smoothness_R3`: (A) Global existence on ℝ³
+< - `navier_stokes_existence_and_smoothness_periodic`: (B) Global existence on ℝ³/ℤ³
+---
+> This reference includes the two breakdown alternatives:
+49,53c57
+< the time derivative is encoded with `derivWithin` relative to `Set.Ici 0`. The Clay
+< PDF also includes errata; in particular, we include spatial 1-periodicity of the
+< pressure in the periodic case. The sign correction to the weak-solution identity in
+< the errata is not represented here, since this file formalizes the four prize
+< alternatives rather than the later weak-solution discussion.
+---
+> the time derivative is encoded with `derivWithin` relative to `Set.Ici 0`.
+56c60
+< open ContDiff Set InnerProductSpace MeasureTheory EuclideanGeometry
+---
+> open ContDiff Set InnerProductSpace MeasureTheory
+59c63,67
+< namespace NavierStokes
+---
+> namespace NavierStokes.Comparator
+> 
+> -- Inlined notation from FormalConjecturesForMathlib.Geometry.Euclidean and Geometry.«3d».
+> local notation "ℝ^" n:65 => EuclideanSpace ℝ (Fin n)
+> local notation "ℝ³" => EuclideanSpace ℝ (Fin 3)
+76c84
+< notation "∇⬝" => divergence
+---
+> local notation "∇⬝" => divergence
+79c87
+< @[simp, category API, AMS 35]
+---
+> @[simp]
+85c93
+< @[simp, category API, AMS 35]
+---
+> @[simp]
+90c98
+< @[simp, category API, AMS 35]
+---
+> @[simp]
+96d103
+< @[category API, AMS 35]
+104d110
+< @[category API, AMS 35]
+266,279d271
+< /-- (A) Existence and smoothness of Navier–Stokes solutions on ℝ³. -/
+< @[category research open, AMS 35]
+< theorem navier_stokes_existence_and_smoothness_R3 (nu : ℝ) (hnu : nu > 0)
+< (u₀ : ℝ³ → ℝ³) (hu₀ : InitialVelocityConditionDecay u₀) :
+< ∃ v p, NavierStokesExistenceAndSmoothnessRn nu u₀ (f := 0) v p := by
+< sorry
+< 
+< /-- (B) Existence and smoothness of Navier–Stokes solutions in ℝ³/ℤ³. -/
+< @[category research open, AMS 35]
+< theorem navier_stokes_existence_and_smoothness_periodic (nu : ℝ) (hnu : nu > 0)
+< (u₀ : ℝ³ → ℝ³) (hu₀ : InitialVelocityConditionPeriodic u₀) :
+< ∃ v p, NavierStokesExistenceAndSmoothnessPeriodic nu u₀ (f := 0) v p := by
+< sorry
+< 
+281d272
+< @[category research open, AMS 35]
+289d279
+< @[category research open, AMS 35]
+296c286
+< end NavierStokes
+---
+> end NavierStokes.Comparator

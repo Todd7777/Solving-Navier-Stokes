@@ -38,10 +38,10 @@ Dates are from the sources listed in Section 5. Items marked † rest on seconda
 
 | claim | evidence | status |
 |---|---|---|
-| (C), (D) as formal theorems in Lean 4 + Mathlib, against DeepMind's independent statement | `openai/NavierStokesAndEuler`, sorry-free, standard axioms only, Comparator + nanoda enabled (per the repository) | **claimed and machine-checked by the authors**; independently reproducible by anyone with the toolchain (see audit §7); not yet refereed |
+| (C), (D) as formal theorems in Lean 4 + Mathlib, against DeepMind's independent statement | `openai/NavierStokesAndEuler`, sorry-free, standard axioms only, Comparator + nanoda enabled (per the repository) | **claimed and machine-checked by the authors**; rebuilt from source and re-checked here on 12–13 Nov 2026 (Comparator, `#print axioms`, `leanchecker`; Lean kernel only; audit §7); not yet refereed |
 | the formal statement is Fefferman's (C)/(D) | line-by-line audit in `03-…` | **confirmed here**, with one documented caveat on the periodic pressure erratum |
 | the English manuscript is a correct human-readable proof | disputed (arXiv:2610.08144; expert comments in the press) | **not established**; the certificate is the Lean development, not the PDF |
-| unforced Euler blowup on $\mathbb R^3$ from smooth compactly supported data | same repository, separate statement | claimed and machine-checked by the authors; a major result on its own if it holds |
+| unforced Euler blowup on $\mathbb R^3$ from smooth compactly supported data | same repository, separate statement | claimed and machine-checked by the authors, and re-checked here with (C)/(D) (audit §7); not part of the Clay problem; a major result on its own if it holds |
 | (A), (B) | nothing new | **open** |
 | unforced Navier–Stokes blowup | nothing new (Alpöge–Buckmaster's withheld result is hypodissipative and forced) | **open** |
 | Clay prize | rules require publication, two years, general acceptance | **not awarded; not claimed** |
@@ -50,6 +50,7 @@ Dates are from the sources listed in Section 5. Items marked † rest on seconda
 
 * a precise statement of the four alternatives and the logic between them (`01-…`);
 * an independent audit of the formal statement and the structure of the formal proof, with the inputs frozen and hashed (`03-…`, `audit/`);
+* a rebuild from source and kernel check of the Lean proof, and its results (`audit/kernel-check/`, `audit/results/kernel-check-2026-11-13/`);
 * complete proofs of the classical estimates and a precise account of the obstruction (`04-…`, `05-…`);
 * a checklist for the next claim (`06-…`);
 * exact symbolic verification of every identity used, and tested numerical instruments (`verify/`, `numerics/`, `tests/`).

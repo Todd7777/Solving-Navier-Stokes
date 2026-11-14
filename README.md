@@ -11,6 +11,10 @@ repository does not solve it.**
 | (D) | breakdown on $\mathbb R^3/\mathbb Z^3$ | same |
 | unforced blowup | the question everyone means | **open** |
 
+On 14 November 2026, Clay's Millennium Problems page listed Navier–Stokes alone under "Active problems", apart from
+its five "Unsolved problems" and the solved Poincaré conjecture, without saying what "Active" means. No prize has been
+awarded (`docs/02-status-november-2026.md`).
+
 What this repository is: an honest, checkable account of where the problem stands, with every claim either proved
 in full, verified by machine, or marked as someone else's claim with its evidence.
 

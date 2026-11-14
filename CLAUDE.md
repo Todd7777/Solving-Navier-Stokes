@@ -52,6 +52,15 @@ In the cloud environment `pytest` on PATH can be a uv tool without numpy or symp
   Mathlib. Compiling and running nanoda are untested. Requests were resized from the GitHub timings: build 32 CPUs,
   128 GB, 4 h; check 8 CPUs, 128 GB, 2 days, with one `leanchecker` replay per 16 GB.
 
+- Sources read on 2026-11-14, when `claymath.org` and `arxiv.org` became reachable from cloud sessions (`openai.com`
+  still answers 403):
+  - Fefferman's official PDF with its errata. docs/01 now cites it; docs/03 §3.4 settles the periodic-pressure
+    erratum from it. The second erratum's weak form is checked in `verify/identities.py`, Section D.
+  - Clay's prize rules (docs/01 §4).
+  - arXiv:2610.08144, quoted in docs/03 §8.
+  - Clay's overview page, which lists Navier–Stokes under "Active problems", apart from the unsolved and solved ones
+    (docs/02, README).
+
 ## Where the next steps are
 
 `docs/05-why-A-and-B-are-open.md` and the audit checklist in `docs/06-failed-claims-and-audit-checklist.md`.

@@ -43,7 +43,7 @@ Comparator runs. Only Mathlib and the checking tools are built first.
 * The Lean release binary. Its SHA-256 is pinned to what was downloaded on 7 November 2026; it is the
   official GitHub release asset of `leanprover/lean4` v4.34.0-rc2, commit `6a10ac8c`.
 * The faithfulness of the challenge statement to Fefferman's (C)/(D). That is a human judgement, made line by
-  line in `docs/03`, Section 3, with one caveat about the periodic-pressure erratum.
+  line in `docs/03`, Section 3, against the official PDF, including Clay's periodic-pressure erratum (Section 3.4).
 * The sandbox, only if the solution could attack the build. Comparator calls `landrun --best-effort`, which
   silently runs **without** isolation on kernels lacking Landlock (Linux < 5.13). The job records whether
   Landlock was active. Comparator's README further asks for a `systemd-run` guard against a landrun vulnerability

@@ -260,8 +260,9 @@ Escauriaza–Seregin–Šverák theorem (2003), proved by a completely different
 
 Replace $-\nu\Delta$ by $\nu(-\Delta)^{\alpha} = \nu\Lambda^{2\alpha}$. The scaling symmetry becomes
 $u_\lambda = \lambda^{2\alpha-1}u(\lambda x,\lambda^{2\alpha}t)$ and $\|u_\lambda\|_{L^2(\mathbb{R}^3)} = \lambda^{2\alpha-5/2}\|u\|_{L^2}$:
-the energy is critical exactly at $\alpha = 5/4$ and subcritical above. Lions (1969) proved global regularity for $\alpha\ge5/4$;
-here is the complete a priori estimate at the endpoint.
+the energy is critical exactly at $\alpha = 5/4$ and subcritical above. Global regularity for $\alpha\ge5/4$ is classical. Katz and
+Pavlović (2001) call it folklore, and it is usually attributed to Lions (1969; not read here, see Section 10). Here is the
+complete a priori estimate at the endpoint.
 
 **Theorem 8 (Lions, $\alpha = 5/4$).** Let $u$ be a smooth solution of $\partial_tu+(u\cdot\nabla)u = -\nu\Lambda^{5/2}u-\nabla p$, $\nabla\cdot u=0$,
 on $\mathbb{T}^3\times[0,T)$. Then
@@ -282,7 +283,9 @@ $\|\Lambda u\|$ and $\|\Lambda^2u\|$ gives $\|\Lambda^{7/4}u\|^2\le\|\Lambda u\|
 ## 9. Deeper theorems (stated, not reproved)
 
 The following are established results with full proofs in the literature. Statements are given in the
-form relevant to the Clay problem.
+form relevant to the Clay problem. On 14 November 2026 each one was checked against what a cloud session could
+read: the paper itself where it is on arXiv, otherwise a later paper or Fefferman's official description that
+states it. Section 10 lists, for every citation in this file, what was read and what was not.
 
 **9.1 Leray–Hopf weak solutions (Leray 1934, Hopf 1951).** For every divergence-free $u_0\in L^2$ (on $\mathbb{R}^3$ or $\mathbb{T}^3$)
 there exists $u\in L^\infty(0,\infty;L^2)\cap L^2(0,\infty;\dot H^1)$, weakly continuous in time, satisfying the equations in the
@@ -294,7 +297,8 @@ $u$ satisfies $u\in L^p(0,T;L^q)$ with $\frac2p+\frac3q=1$, $3\le q\le\infty$, t
 Leray–Hopf solution with the same data. Theorem 7 above is the a priori version for $q>3$.
 
 **9.3 Beale–Kato–Majda (1984).** A smooth solution on $[0,T)$ (Euler or Navier–Stokes) extends past $T$ if and only if
-$\int_0^T\|\omega(t)\|_{L^\infty}\,dt<\infty$.
+$\int_0^T\|\omega(t)\|_{L^\infty}\,dt<\infty$. The paper concerns Euler; the Navier–Stokes case is standard but was not
+checked here (Section 10).
 
 **9.4 Partial regularity (Caffarelli–Kohn–Nirenberg 1982; Scheffer 1976–80; Lin 1998).** For *suitable* weak solutions (Leray–Hopf
 solutions satisfying a local energy inequality) the singular set $S\subset\mathbb{R}^3\times(0,\infty)$ has one-dimensional parabolic
@@ -302,28 +306,64 @@ Hausdorff measure zero: $\mathcal P^1(S)=0$. In particular singularities, if any
 
 **9.5 Global regularity in special classes.** 2D (Theorem 4); axisymmetric flows without swirl (Ladyzhenskaya 1968; Ukhovskii–Yudovich 1968);
 helically symmetric flows (Mahalov–Titi–Leibovich 1990); small data in critical spaces (Theorem 6; Kato 1984; Koch–Tataru 2001);
-hyperdissipation $\alpha\ge5/4$ (Theorem 8; Lions 1969; Tao 2009 for a logarithmic improvement).
+hyperdissipation $\alpha\ge5/4$ (Theorem 8; folklore according to Katz–Pavlović 2001, usually attributed to Lions 1969; Tao
+2009 for a logarithmic improvement).
 
 **9.6 Obstructions (what a proof of (A) cannot look like).**
-* Tao, *Finite time blowup for an averaged three-dimensional Navier–Stokes equation*, J. Amer. Math. Soc. 29 (2016): there is an
-  "averaged" bilinear operator $\tilde B$, obeying the same energy identity, the same scaling, and the same harmonic-analysis
-  estimates as the true nonlinearity, for which smooth Schwartz data blow up in finite time. Any proof of (A) must therefore use a
-  property of the true nonlinearity that the averaged one lacks.
-* Buckmaster–Vicol, *Nonuniqueness of weak solutions to the Navier–Stokes equation*, Ann. of Math. 189 (2019): distributional
-  solutions with finite energy (not Leray–Hopf) are not unique; in fact the kinetic energy profile can be prescribed.
-* Albritton–Brué–Colombo, *Non-uniqueness of Leray solutions of the forced Navier–Stokes equations*, Ann. of Math. 196 (2022):
-  with a suitable (singular in time, but $L^1_tL^2_x$) body force, Leray–Hopf solutions from zero initial data are not unique.
-  Uniqueness of unforced Leray–Hopf solutions remains open.
+* Tao, *Finite time blowup for an averaged three-dimensional Navier–Stokes equation*, J. Amer. Math. Soc. 29 (2016) 601–674:
+  there is an "averaged" bilinear operator $\tilde B$, an average of the true nonlinearity over rotations, dilations in a compact
+  range, and Fourier multipliers of order zero. It keeps the cancellation $\langle\tilde B(u,u),u\rangle=0$, hence the energy
+  identity, and up to constants it obeys every estimate the true nonlinearity obeys in the Sobolev spaces $W^{s,p}$, $1<p<\infty$.
+  For it, Schwartz divergence-free data exist with no global mild solution (Theorem 1.5). Any proof of (A) must therefore use
+  finer structure of the true nonlinearity than harmonic-analysis estimates and the energy identity provide. (An earlier version
+  of this file also said "the same scaling"; Tao does not claim that, and order-zero multipliers need not be dilation-invariant.)
+* Buckmaster–Vicol, *Nonuniqueness of weak solutions to the Navier–Stokes equation*, Ann. of Math. 189 (2019) 101–144: on
+  $\mathbb T^3$, for every smooth nonnegative $e(t)$ on $[0,T]$ there is a weak solution with $\int|v(x,t)|^2dx=e(t)$
+  (Theorem 1.2). So distributional solutions with finite energy (not Leray–Hopf) are not unique, and their kinetic energy
+  profile can be prescribed.
+* Albritton–Brué–Colombo, *Non-uniqueness of Leray solutions of the forced Navier–Stokes equations*, Ann. of Math. 196 (2022)
+  415–455: for a body force $f\in L^1_tL^2_x$, self-similar and singular at $t=0$, there are two distinct suitable Leray–Hopf
+  solutions with $u_0\equiv0$ (Theorem 1.2). "It is, moreover, an open problem to remove the force": uniqueness of unforced
+  Leray–Hopf solutions was open when they wrote, and nothing read here settles it.
 
 **9.7 Blowup for related equations.**
-* Elgindi (Ann. of Math. 2021): finite-time singularity for 3D Euler from $C^{1,\alpha}$ (not smooth) data on $\mathbb{R}^3$.
-* Chen–Hou (2022–23, computer-assisted): finite-time blowup for 3D axisymmetric Euler with smooth data in a cylinder with boundary,
-  and for 2D Boussinesq.
-* Córdoba–Martínez-Zoroa (2023–25): finite-time blowup for 3D Euler and related models *with a forcing term*.
-* Alpöge–Buckmaster (September 2026, with Coiculescu for IPM): finite-time blowup with smooth forcing for the incompressible porous
-  medium equation, 2D Boussinesq and 3D Euler, with Lean formalizations. Their hypodissipative Navier–Stokes result is announced but withheld pending formal verification.
+* Elgindi (Ann. of Math. 194 (2021) 647–727): finite-time singularity for 3D Euler from $C^{1,\alpha}$ (not smooth) data on
+  $\mathbb{R}^3$.
+* Chen–Hou (arXiv 2022–23, computer-assisted): finite-time blowup for 3D axisymmetric Euler with smooth data of finite energy in
+  the cylinder $(r,z)\in[0,1]\times\mathbb T$, which has a boundary, and for 2D Boussinesq.
+* Córdoba–Martínez-Zoroa (2023–25): finite-time blowup *with a forcing term*. 3D Euler on $\mathbb R^3$ with a force uniformly in
+  $C^{1,\frac12-\varepsilon}\cap L^2$ (2023); with Zheng, hypodissipative Navier–Stokes with a force in
+  $L^1_tC^{1,\varepsilon}_x\cap L^\infty_tL^2_x$ (2024); and IPM with a smooth, compactly supported source (2024). Also with Zheng,
+  unforced 3D Euler in $C^\infty(\mathbb R^3\setminus\{0\})\cap C^{1,\alpha}\cap L^2$ (2023).
+* Alpöge–Buckmaster (September 2026): finite-time blowup with smooth forcing for the incompressible porous medium equation (with
+  Coiculescu, on $\mathbb T^2$, with a force uniformly smooth in space-time), 2D Boussinesq on $\mathbb R^2$, and 3D Euler on
+  $\mathbb R^3$ within axisymmetric flows with swirl. The latter two are announced with Lean formalizations, their human-readable
+  proofs still to come. Buckmaster's statement of 8 September says of hypodissipative Navier–Stokes: "We are not releasing that
+  paper today: unlike the above, the Lean verification has not yet finished."
 * OpenAI (8 September 2026): forced finite-time blowup for 3D Navier–Stokes on $\mathbb{R}^3$ and $\mathbb{T}^3$ (Clay (C) and (D)), and
-  unforced blowup for 3D Euler from smooth compactly supported data on $\mathbb{R}^3$, with Lean formalizations. Under review; see
-  `02-status-november-2026.md` and `03-audit-openai-lean-formalization.md`.
+  unforced blowup for 3D Euler from smooth compactly supported data on $\mathbb{R}^3$, with Lean formalizations, which this
+  repository rebuilt and kernel-checked (`03-audit-openai-lean-formalization.md`, Section 7). Under review; see
+  `02-status-november-2026.md`.
 
 None of 9.6–9.7 proves or disproves (A) or (B).
+
+## 10. Sources: what was read (14 November 2026)
+
+**Cited** below means the statement used here was checked against the source named, read from a cloud session; "via"
+names a later text that states the result when the original could not be read. Publication data are checked against
+Crossref. "Not read here" means the attribution rests on the reference alone.
+
+| used for | reference | status |
+|---|---|---|
+| Lemma 0.3; the continuation criterion | Robinson–Rodrigo–Sadowski, *The Three-Dimensional Navier–Stokes Equations* (CUP 2016); Temam, *Navier–Stokes Equations* | textbooks, not read here |
+| Theorem 4 (2D) | Ladyzhenskaya 1959; Lions–Prodi 1959 | not read here; Fefferman's official description credits Ladyzhenskaya for 2D |
+| Theorem 6, 9.5 (small data) | Kato, Math. Z. 187 (1984) 471–480; Koch–Tataru, Adv. Math. 157 (2001) 22–35 | Koch–Tataru in $BMO^{-1}$: **Cited** via Albritton–Brué–Colombo, §1.2; Kato not read here (paywalled) |
+| Theorem 8, 9.5 (hyperdissipation) | Lions 1969; Katz–Pavlović, arXiv:math/0104199 (GAFA 2002); Tao, Anal. PDE 2 (2009) 361–366, arXiv:0906.3070 | **Cited**: Katz–Pavlović state $\alpha>5/4$ as Proposition 1.1, a result that "appears to exist in the folklore and we have not succeeded in attributing it"; Tao's abstract gives the logarithmic improvement. Lions 1969 not read here |
+| 9.1 | Leray, Acta Math. 63 (1934) 193–248; Hopf 1951 | **Cited** via Albritton–Brué–Colombo (Definition 1.1 and the paragraph after it) and Buckmaster–Vicol §1 (uniqueness "remains however open"); originals not read here |
+| 9.2 | Prodi 1959; Serrin 1963; Escauriaza–Seregin–Šverák, Russian Math. Surveys 58 (2003) 211–250 | **Cited** via Buckmaster–Vicol §1: under $2/p+3/q\le1$ a Leray–Hopf solution "is unique and smooth in positive time", and ESS "proved the $L^\infty_tL^3_x$ endpoint"; originals not read here |
+| 9.3 | Beale–Kato–Majda, Comm. Math. Phys. 94 (1984) 61–66 | Euler: **Cited** (abstract, and Fefferman's official description); Navier–Stokes: not checked |
+| 9.4 | Caffarelli–Kohn–Nirenberg, Comm. Pure Appl. Math. 35 (1982) 771–831; Lin, ibid. 51 (1998) 241–257; Scheffer | **Cited** via Fefferman's official description ($\mathcal P^1(E)=0$; no space-time curve $x=\varphi(t)$); originals not read here |
+| 9.5 (symmetric flows) | Ladyzhenskaya 1968; Ukhovskii–Yudovich 1968; Mahalov–Titi–Leibovich 1990 | axisymmetric without swirl: **Cited** via Albritton–Brué–Colombo (Ladyzhenskaya); Ukhovskii–Yudovich and Mahalov–Titi–Leibovich not read here |
+| 9.6 | Tao, arXiv:1402.0290; Buckmaster–Vicol, arXiv:1709.10033; Albritton–Brué–Colombo, arXiv:2112.03116 | **Cited** (read: the theorems and passages named in 9.6) |
+| 9.7 | Elgindi, arXiv:1904.04795; Chen–Hou, arXiv:2210.07191 and 2305.05660 (Part II: Multiscale Model. Simul. 23 (2025) 25–130); Córdoba–Martínez-Zoroa, arXiv:2309.08495, 2410.22920, and with Zheng 2308.12197, 2407.06776; Alpöge–Buckmaster–Coiculescu, arXiv:2609.16470; Buckmaster's statement, `cims.nyu.edu/~tristanb/statement.pdf` | **Cited**: the abstracts, Theorem 2 of Chen–Hou's Part I, the introduction of the IPM paper, and Buckmaster's 4-page statement in full |
+| 9.7 (OpenAI) | OpenAI's announcement | not reachable (403); see `02-…` and `03-…` |

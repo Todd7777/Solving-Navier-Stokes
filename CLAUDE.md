@@ -60,6 +60,12 @@ In the cloud environment `pytest` on PATH can be a uv tool without numpy or symp
   - arXiv:2610.08144, quoted in docs/03 §8.
   - Clay's overview page, which lists Navier–Stokes under "Active problems", apart from the unsolved and solved ones
     (docs/02, README).
+  - The citations in docs/04 (§9, and the attributions in §§0, 4, 6, 8). Its new Section 10 says, for each, what was read:
+    the arXiv papers themselves, a later paper or Fefferman's PDF for the classics, and which ones remain unread
+    (Kato 1984, Lions 1969, Ukhovskii–Yudovich, Mahalov–Titi–Leibovich, BKM for Navier–Stokes, the textbooks).
+    Corrections made: Tao's averaged operator is not claimed to share the scaling; α ≥ 5/4 is folklore per
+    Katz–Pavlović; Buckmaster–Vicol is on T³; the forces of Córdoba–Martínez-Zoroa and Alpöge–Buckmaster are stated.
+    arXiv's API refuses this proxy (429); the abstract pages, PDFs and Crossref's API work.
 
 ## Where the next steps are
 

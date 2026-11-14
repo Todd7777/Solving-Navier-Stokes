@@ -69,6 +69,7 @@ Primary (read directly in this session):
 Primary (read directly on 14 November 2026, when these hosts had become reachable):
 * Clay Mathematics Institute: official statement `https://www.claymath.org/wp-content/uploads/2022/06/navierstokes.pdf` (SHA-256 `c1b5f27b…`; see `01-…`); rules `https://www.claymath.org/wp-content/uploads/2022/03/millennium_prize_rules_0.pdf` (SHA-256 `9b500374…`), linked from `https://www.claymath.org/millennium-problems/rules`; the problem page `https://www.claymath.org/millennium/navier-stokes-equation/`, which states no status; and the overview `https://www.claymath.org/millennium-problems/`, which lists Navier–Stokes under "Active problems" (timeline, 14 Nov).
 * Bastounis, Circelli, Hansen, arXiv:2610.08144v1 (`https://arxiv.org/abs/2610.08144`; PDF SHA-256 `3282e2c4…`), quoted in `03-…`, Section 8.
+* Tristan Buckmaster's statement of 8 September 2026, `https://cims.nyu.edu/~tristanb/statement.pdf` (4 pages, read in full), and Alpöge–Buckmaster–Coiculescu, arXiv:2609.16470 (introduction); used in the Aug–Sep row above and in `04-…`, Section 9.7. The papers checked for `04-…` are listed in its Section 10.
 
 Primary (not reachable from the sandbox; cited by URL):
 * OpenAI announcement: `https://openai.com/index/navier-stokes-solution/` (still refused on 14 November); manuscripts `https://cdn.openai.com/pdf/32d9f210-8b73-45e0-91bc-82a30aef8a9a/navier-stokes.pdf` and `https://cdn.openai.com/pdf/315b36cd-ec98-4023-8342-93345194ece1/euler.pdf`.
@@ -77,4 +78,4 @@ Primary (not reachable from the sandbox; cited by URL):
 * Otelbaev counterexample: `https://warwick.ac.uk/fac/sci/maths/people/staff/james_robinson/lf/otelbaev/`; `https://aperiodical.com/2014/06/so-what-happened-to-the-abc-conjecture-and-navier-stokes/`.
 
 Secondary (press; used only for dates and quotations, marked † above):
-Quanta Magazine (8 Sep 2026), Scientific American (Sep–Oct 2026, three articles), Science (`science.org`, "How an AI math breakthrough ignited a controversy"), Axios (8 Sep 2026), The Tufts Daily (Sep 2026), the-decoder.com, and the statement by Tristan Buckmaster hosted at `cims.nyu.edu/~tristanb/statement.pdf`.
+Quanta Magazine (8 Sep 2026), Scientific American (Sep–Oct 2026, three articles), Science (`science.org`, "How an AI math breakthrough ignited a controversy"), Axios (8 Sep 2026), The Tufts Daily (Sep 2026), and the-decoder.com.

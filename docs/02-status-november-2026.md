@@ -32,14 +32,15 @@ Dates are from the sources listed in Section 5. Items marked † rest on seconda
 | late Sep 2026 | Preprints on the *unforced* search (e.g. arXiv:2609.23868, "The Positive Defect Problem") and expository companions to the OpenAI construction (arXiv:2609.35406). |
 | 6 Oct 2026 | Bastounis, Circelli, Hansen, arXiv:2610.08144, *Navier–Stokes lost in translation*: argue that bound (10.19) and the argument of Lemma 8.6 in the manuscript are not faithfully represented in the Lean development (file `NavierStokes/R3/PressureFlux.lean`), and that Lean-checking an autoformalization does not certify the natural-language proof. They explicitly do not claim the theorem is false. |
 | Oct 2026† | Scientific American: experts working through the manuscript say it does *not* follow the Córdoba–Martínez-Zoroa program OpenAI first cited (Cao-Labora: "a fundamentally different method"); De Lellis: resolution of the provenance question is unlikely because the model's reasoning is opaque. |
-| 5 Nov 2026 | No refereed publication; Clay lists the problem as open; (A)/(B) open; no public unforced result. |
+| 5 Nov 2026 | No refereed publication; no prize awarded; (A)/(B) open; no public unforced result. (This row first said that Clay lists the problem as open; that was written while `claymath.org` could not be read, and the next row gives what Clay's site shows.) |
+| 14 Nov 2026 | Clay's Millennium Problems page (`https://www.claymath.org/millennium-problems/`, read this day) lists Navier–Stokes alone under "Active problems", apart from the five "Unsolved problems" and the "Solved problems" (Poincaré). The page does not say what "Active" means. Its Navier–Stokes entry says that "for many decades no proof was found answering the most basic questions one can ask". |
 
 ## 3. What is and is not established
 
 | claim | evidence | status |
 |---|---|---|
 | (C), (D) as formal theorems in Lean 4 + Mathlib, against DeepMind's independent statement | `openai/NavierStokesAndEuler`, sorry-free, standard axioms only, Comparator + nanoda enabled (per the repository) | **claimed and machine-checked by the authors**; rebuilt from source and re-checked here on 12–13 Nov 2026 (Comparator, `#print axioms`, `leanchecker`; Lean kernel only; audit §7); not yet refereed |
-| the formal statement is Fefferman's (C)/(D) | line-by-line audit in `03-…` | **confirmed here**, with one documented caveat on the periodic pressure erratum |
+| the formal statement is Fefferman's (C)/(D) | line-by-line audit in `03-…` | **confirmed here** against the official PDF (read 14 Nov 2026), including Clay's erratum that requires periodic pressure in (D) |
 | the English manuscript is a correct human-readable proof | disputed (arXiv:2610.08144; expert comments in the press) | **not established**; the certificate is the Lean development, not the PDF |
 | unforced Euler blowup on $\mathbb R^3$ from smooth compactly supported data | same repository, separate statement | claimed and machine-checked by the authors, and re-checked here with (C)/(D) (audit §7); not part of the Clay problem; a major result on its own if it holds |
 | (A), (B) | nothing new | **open** |
@@ -65,10 +66,12 @@ Primary (read directly in this session):
 * `https://github.com/google-deepmind/formal-conjectures` — `FormalConjectures/Millenium/NavierStokes.lean` at commit `8bf45ed7…` and at `main` (now `Millennium/`).
 * `https://github.com/leanprover/comparator` — what the Comparator check guarantees (now `lake check` in Lean ≥ 4.35).
 
+Primary (read directly on 14 November 2026, when these hosts had become reachable):
+* Clay Mathematics Institute: official statement `https://www.claymath.org/wp-content/uploads/2022/06/navierstokes.pdf` (SHA-256 `c1b5f27b…`; see `01-…`); rules `https://www.claymath.org/wp-content/uploads/2022/03/millennium_prize_rules_0.pdf` (SHA-256 `9b500374…`), linked from `https://www.claymath.org/millennium-problems/rules`; the problem page `https://www.claymath.org/millennium/navier-stokes-equation/`, which states no status; and the overview `https://www.claymath.org/millennium-problems/`, which lists Navier–Stokes under "Active problems" (timeline, 14 Nov).
+* Bastounis, Circelli, Hansen, arXiv:2610.08144v1 (`https://arxiv.org/abs/2610.08144`; PDF SHA-256 `3282e2c4…`), quoted in `03-…`, Section 8.
+
 Primary (not reachable from the sandbox; cited by URL):
-* OpenAI announcement: `https://openai.com/index/navier-stokes-solution/`; manuscripts `https://cdn.openai.com/pdf/32d9f210-8b73-45e0-91bc-82a30aef8a9a/navier-stokes.pdf` and `https://cdn.openai.com/pdf/315b36cd-ec98-4023-8342-93345194ece1/euler.pdf`.
-* Clay Mathematics Institute: problem page `https://www.claymath.org/millennium/navier-stokes-equation/`; official statement `https://www.claymath.org/wp-content/uploads/2022/06/navierstokes.pdf`; rules `https://www.claymath.org/millennium-problems/rules`.
-* Bastounis, Circelli, Hansen, arXiv:2610.08144 (`https://arxiv.org/abs/2610.08144`).
+* OpenAI announcement: `https://openai.com/index/navier-stokes-solution/` (still refused on 14 November); manuscripts `https://cdn.openai.com/pdf/32d9f210-8b73-45e0-91bc-82a30aef8a9a/navier-stokes.pdf` and `https://cdn.openai.com/pdf/315b36cd-ec98-4023-8342-93345194ece1/euler.pdf`.
 * Albritton, Brué, Colombo, Ann. of Math. 196 (2022) 415–455 (`https://annals.math.princeton.edu/2022/196-1/p03`).
 * Google DeepMind blog, 18 Sep 2025 (`https://deepmind.google/blog/discovering-new-solutions-to-century-old-problems-in-fluid-dynamics/`).
 * Otelbaev counterexample: `https://warwick.ac.uk/fac/sci/maths/people/staff/james_robinson/lf/otelbaev/`; `https://aperiodical.com/2014/06/so-what-happened-to-the-abc-conjecture-and-navier-stokes/`.

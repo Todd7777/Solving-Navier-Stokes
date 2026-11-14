@@ -62,6 +62,53 @@ def test_resubmitting_the_check_alone_has_no_dependency(tmp_path):
     assert len(jobs) == 1 and jobs[0].startswith("check=") and "--dependency" not in jobs[0]
 
 
+def path_without_cargo():
+    """This PATH minus every directory that holds a cargo."""
+    dirs = os.environ.get("PATH", "").split(os.pathsep)
+    return os.pathsep.join(d for d in dirs if d and not (pathlib.Path(d) / "cargo").exists())
+
+
+def test_submitting_with_nanoda_passes_NANODA_to_every_job(tmp_path):
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    (stub / "cargo").write_text("#!/bin/sh\nexit 0\n")
+    (stub / "cargo").chmod(0o755)
+    path = f"{stub}{os.pathsep}{path_without_cargo()}"
+    r = run("submit_fasrc.sh", "--dry-run", "--nanoda", WORK=str(tmp_path / "work"), PATH=path)
+    assert r.returncode == 0, r.stderr
+    jobs = sbatch_lines(r.stdout)
+    assert len(jobs) == 3 and all(",NANODA=1 " in job for job in jobs)
+    r = run("submit_fasrc.sh", "--dry-run", WORK=str(tmp_path / "work"), PATH=path)
+    assert not any("NANODA" in job for job in sbatch_lines(r.stdout))  # only on request
+
+
+def test_submitting_with_nanoda_needs_cargo(tmp_path):
+    r = run("submit_fasrc.sh", "--dry-run", "--nanoda", WORK=str(tmp_path), PATH=path_without_cargo())
+    assert r.returncode == 2 and "cargo" in r.stderr and not sbatch_lines(r.stdout)
+
+
+def test_NANODA_1_without_cargo_stops_the_fetch_before_any_download(tmp_path):
+    work = tmp_path / "work"
+    r = run("kernel_check.sh", "fetch", WORK=str(work), NANODA="1", PATH=path_without_cargo())
+    assert r.returncode == 1
+    summary = (work / "results" / "SUMMARY.txt").read_text()
+    assert summary.startswith("FATAL") and "cargo is not on PATH" in summary
+    assert list((work / "tools").iterdir()) == []  # not even the Lean release was downloaded
+
+
+def test_NANODA_1_fails_a_check_whose_build_made_no_nanoda(tmp_path):
+    work = fake_check_work(tmp_path)
+    r = run("kernel_check.sh", "check", WORK=str(work), NANODA="1", STUB_LOG=str(tmp_path / "calls"))
+    assert r.returncode == 1
+    assert "NANODA=1 but nanoda was not built" in (work / "results" / "SUMMARY.txt").read_text()
+    assert not (tmp_path / "calls").exists()  # Comparator never ran without it
+
+
+def test_an_unknown_NANODA_value_is_refused(tmp_path):
+    r = run("kernel_check.sh", "check", WORK=str(tmp_path), NANODA="yes")
+    assert r.returncode == 2 and "NANODA must be" in r.stderr
+
+
 @pytest.mark.parametrize("work", [None, "relative/dir"])
 def test_a_missing_or_relative_work_directory_is_refused(work):
     env = {} if work is None else {"WORK": work}

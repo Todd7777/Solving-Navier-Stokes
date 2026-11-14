@@ -24,8 +24,8 @@ wrote it (see "Why this was not run here" below). It has since run in full on Gi
    the Euler challenge. It builds the challenge and the solution itself, exports both environments with
    `lean4export`, checks that each main theorem has *exactly* the challenge's statement (down to every
    definition it mentions), that it uses only `propext`, `Quot.sound` and `Classical.choice`, and replays the
-   exported proof closure through the Lean kernel and, if Rust is available, through the independent
-   `nanoda` kernel.
+   exported proof closure through the Lean kernel. With `NANODA=1`, or `cargo` on the `PATH`, it also runs the
+   independent `nanoda` kernel, pinned to commit `0da9f98` and built from source with its locked crates.
 3. **`#print axioms`** for the four main theorems; the script fails unless each depends on exactly
    `{propext, Classical.choice, Quot.sound}`.
 4. **`leanchecker`** (shipped with Lean): replays every declaration of every `NavierStokes.*` and `Euler.*`
@@ -39,11 +39,11 @@ Comparator runs. Only Mathlib and the checking tools are built first.
 
 ## Trust that remains after a PASS
 
-* The Lean kernel, or nanoda if it ran.
+* The Lean kernel. With nanoda both kernels must accept, so what remains is that at least one of them is sound.
 * The Lean release binary. Its SHA-256 is pinned to what was downloaded on 7 November 2026; it is the
   official GitHub release asset of `leanprover/lean4` v4.34.0-rc2, commit `6a10ac8c`.
 * The faithfulness of the challenge statement to Fefferman's (C)/(D). That is a human judgement, made line by
-  line in `docs/03`, Section 3, with one caveat about the periodic-pressure erratum.
+  line in `docs/03`, Section 3, against the official PDF, including Clay's periodic-pressure erratum (Section 3.4).
 * The sandbox, only if the solution could attack the build. Comparator calls `landrun --best-effort`, which
   silently runs **without** isolation on kernels lacking Landlock (Linux < 5.13). The job records whether
   Landlock was active. Comparator's README further asks for a `systemd-run` guard against a landrun vulnerability
@@ -83,21 +83,22 @@ git clone https://github.com/Todd7777/Solving-Navier-Stokes.git
 cd Solving-Navier-Stokes
 export WORK=$SCRATCH/<lab>/Lab/$USER/ns-kernel-check   # shared storage; FASRC's example lab is jharvard_lab
 audit/kernel-check/submit_fasrc.sh --dry-run           # prints the three sbatch commands
-audit/kernel-check/submit_fasrc.sh                     # submits them
+audit/kernel-check/submit_fasrc.sh                     # submits them; add --nanoda for the second kernel (below)
 ```
 
 | stage | partition | CPUs | memory | time limit | basis |
 |---|---|---|---|---|---|
-| fetch | `test` | 2 | 2 GB | 30 min | measured in a cloud session: 66 s, largest process 100 MB, 4.2 GB written; needs GitHub |
-| build | `sapphire` | 64 | 256 GB | 8 h | Mathlib from source: 2.30 million lines in 8,370 files at the pinned commit |
-| check | `sapphire` | 16 | 256 GB | 2 days | builds the solution (0.64 million lines, 2,655 files), then long single-threaded kernel replays |
+| fetch | `test` | 2 | 2 GB | 30 min | measured in a cloud session: 66 s, largest process 100 MB, 4.2 GB written; needs GitHub, and crates.io for nanoda |
+| build | `sapphire` | 32 | 128 GB | 4 h | GitHub's 4-CPU runners built Mathlib in 2 h 51 min within 16 GB, 4 GB per thread |
+| check | `sapphire` | 8 | 128 GB | 2 days | one `leanchecker` replay fit in 16 GB on GitHub, so 8 run at once here; nanoda's time is not yet measured |
 
-Only the fetch figures are measured, in a cloud session; nothing has been built on Cannon yet. For scale, on GitHub's
-runners (4 CPUs, 16 GB) the Mathlib build took 2 h 51 min and the check steps 8 h 19 min, replaying one module at a
-time, and nothing ran out of memory (`audit/results/kernel-check-2026-11-13/`). Lean sizes its thread pools by the CPUs of
-the node, not of the job, so the job sets `LEAN_NUM_THREADS` to its CPU count. `leanchecker NavierStokes Euler` replays
-modules in parallel, and each replay reads its own copy of the `.olean` files it imports (Lean maps a file at a fixed
-address only once per process), so the job runs one replay per 12 GB of memory (`LEANCHECKER_THREADS`).
+Nothing has been built on Cannon yet. The requests come from the GitHub run of 12–13 November
+(`audit/results/kernel-check-2026-11-13/`). There, with 4 CPUs and 16 GB, the Mathlib build took 2 h 51 min and the
+check steps 8 h 19 min, replaying one module at a time, and nothing ran out of memory. Lean sizes its thread pools by
+the CPUs of the node, not of the job, so the job sets `LEAN_NUM_THREADS` to its CPU count. `leanchecker NavierStokes
+Euler` replays modules in parallel, and each replay reads its own copy of the `.olean` files it imports (Lean maps a
+file at a fixed address only once per process), so the job runs one replay per 16 GB of memory
+(`LEANCHECKER_THREADS`).
 
 * **Resuming.** Everything lives in `WORK`. If a job runs out of time, submit again from that stage
   (`submit_fasrc.sh build` submits build and check, `submit_fasrc.sh check` only check). Lake keeps every module already
@@ -107,24 +108,55 @@ address only once per process), so the job runs one replay per 12 GB of memory (
 * **Fairshare.** Every job is CPU-only. FASRC charges the cores and memory a job was given for as long as it runs,
   failed and killed jobs included. `sapphire` costs 0.6 per core-hour and, by FASRC's formula, about 0.07 per GB-hour
   (exact weights: `scontrol show partition sapphire`), less than `shared` (1.0 per core-hour) or the requeue
-  partitions (0.125 per GB-hour); `test` is exempt but meant for development and testing. At these sizes a 2-hour
-  build would cost about 110 TRES-hours and a 12-hour check about 320. The check asks for only 16 cores because most
-  of it is single-threaded. To spend less: try the build on `test` for an hour first
-  (`KC_SBATCH_BUILD="--partition=test --time=0-01:00" audit/kernel-check/submit_fasrc.sh`; the check job is then
-  cancelled, and a later `submit_fasrc.sh build` continues where the test stopped), resume instead of restarting, and
-  size later runs with `seff <job>`.
+  partitions (0.125 per GB-hour); `test` is exempt but meant for development and testing. At these sizes the build
+  costs about 28 TRES per hour and the check about 14, so a 1-hour build and a 12-hour check come to about 190. The
+  check asks for only 8 cores because most of it is single-threaded. To spend less: try the build on `test` for an
+  hour first (`KC_SBATCH_BUILD="--partition=test --time=0-01:00" audit/kernel-check/submit_fasrc.sh`; the check job
+  is then cancelled, and a later `submit_fasrc.sh build` continues where the test stopped), resume instead of
+  restarting, and size later runs with `seff <job>`.
 * **Killed is not rejected.** A step that fails with `rc=137` was killed, usually for exceeding its memory, and says
   nothing about the proof. See `sacct -j <job> -o JobID,State,MaxRSS,ReqMem` and resubmit with more memory or a smaller
   `LEANCHECKER_THREADS`, with `RESUME_CHECK=1` so that only the killed step runs again.
-* **Network.** Only the fetch job needs it, plus the build job if `cargo` or Go is on your `PATH` (to clone nanoda or
-  landrun). If compute nodes cannot reach GitHub, run `audit/kernel-check/kernel_check.sh fetch` on a login node with
-  `WORK` set (about 20 s of CPU) and then `submit_fasrc.sh build`.
+* **Network.** Only the fetch job needs it: GitHub, and crates.io for nanoda's crates. The build job needs it only if
+  Go is on your `PATH` and the node has Landlock (to clone landrun), which Cannon's nodes do not. If compute nodes
+  cannot reach the internet, run `audit/kernel-check/kernel_check.sh fetch` on a login node with `WORK` set (about
+  20 s of CPU; `NANODA=1` in front for nanoda) and then `submit_fasrc.sh build`.
 * **Sandbox.** landrun needs Landlock (Linux 5.13 or later). FASRC's compute nodes run Rocky Linux 8.10 with kernel 4.18
   (FASRC, June 2025), so expect Comparator's unsandboxed shim; `SUMMARY.txt` and `machine-check.txt` record what the
   check node had. See "Trust that remains after a PASS".
-* **Optional tools** come from the `PATH` you submit with: install Rust (rustup) first if you want the nanoda kernel.
+* **Optional tools** come from the `PATH` you submit with; for nanoda, see below.
 * **Scratch is purged.** FASRC deletes netscratch files older than 90 days (60 from December 2026). Copy `results/`
   out when the check finishes.
+
+#### With the nanoda second kernel
+
+nanoda is an independent type checker for Lean, written in Rust. If both kernels accept, the result no longer rests
+on Lean's kernel alone. FASRC's documentation lists no Rust module (`module spider rust` shows what the cluster has),
+so install Rust in your home directory once, on a login node:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+source "$HOME/.cargo/env"
+```
+
+Then submit as above, adding `--nanoda`. It refuses to submit if `cargo` is not on the `PATH`.
+
+```bash
+audit/kernel-check/submit_fasrc.sh --nanoda --dry-run
+audit/kernel-check/submit_fasrc.sh --nanoda
+```
+
+* The fetch job downloads nanoda at the pinned commit (`0da9f98`, nanoda 0.4.32 of 7 November 2026) and the crates
+  its `Cargo.lock` names, into `WORK`. That commit reads export format 3.1.0, which the pinned lean4export writes.
+  The build job compiles nanoda offline (`cargo build --frozen`) before Mathlib, so a problem with it shows within
+  minutes. Cargo runs from nanoda's own directory, never from the audited project's.
+* Comparator then runs nanoda on each exported solution, with the configuration Comparator writes itself: the
+  permitted axioms, one checking thread, and nanoda's default stack of 32 MB. `SUMMARY.txt` records the nanoda commit
+  and the Rust version, and its Comparator lines read `kernel replay, nanoda`.
+* If nanoda fails, `comparator-<name>.log` says that the nanoda kernel rejected the solution and gives nanoda's own
+  message. First rule out a limit of the tool: an export-format error, a stack overflow (Rust prints `has overflowed
+  its stack`), or a job killed for memory (`sacct ... -o State,MaxRSS`). A type error reported by nanoda, with the
+  Lean kernel accepting, would be a finding of the first order.
 
 ### On GitHub Actions (free, experimental)
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Exact symbolic verification of every pointwise identity used in docs/04-rigorously-proven-results.md.
+"""Exact symbolic verification of every pointwise identity used in docs/04-rigorously-proven-results.md,
+and of the weak formulation as corrected in the errata of the official statement (docs/01, Section 1).
 
 Run:  python verify/identities.py        (exit status 0 iff every check passes)
 
@@ -267,10 +268,44 @@ def section_C():
     check("[3D] witness: int |grad u|^2 = int |curl u|^2 (Lemma 0.4, exact)", torus_integral(gradsq) - torus_integral(sum(wi ** 2 for wi in w)))
 
 
+# ----------------------------------------------------------------------------
+# D. The weak formulation as corrected in the errata of the official statement (docs/01)
+# ----------------------------------------------------------------------------
+# The errata replace Fefferman's weak formulation (12) by
+#     -∬ u.d_t(theta) - sum_ij ∬ u_i u_j d_j(theta_i) = nu ∬ u.Lap(theta) + ∬ f.theta + ∬ p div(theta).
+# Pointwise, (residual of (1)).theta minus the integrand of (left side - right side) is a space-time
+# divergence minus (div u)(u.theta). For a test field theta compactly supported in R^3 x (0, inf) the
+# divergence integrates to zero, and (2) removes the last term: smooth solutions satisfy the corrected form.
+
+def section_D():
+    X = coords(3)
+    t, nu = sp.symbols("t nu", real=True)
+    u = [sp.Function(f"u{i + 1}")(*X, t) for i in range(3)]
+    th = [sp.Function(f"theta{i + 1}")(*X, t) for i in range(3)]
+    f = [sp.Function(f"f{i + 1}")(*X, t) for i in range(3)]
+    p = sp.Function("p")(*X, t)
+    weak = (-dot(u, [sp.diff(c, t) for c in th])
+            - sum(u[i] * u[j] * sp.diff(th[i], X[j]) for i in range(3) for j in range(3))
+            - nu * dot(u, [lap(c, X) for c in th]) - dot(f, th) - p * div(th, X))
+    divergence = (sp.diff(dot(u, th), t)
+                  + sum(sp.diff(u[j] * dot(u, th), X[j]) for j in range(3))
+                  + nu * sum(sp.diff(dot(u, [sp.diff(c, X[j]) for c in th]) - dot(th, [sp.diff(c, X[j]) for c in u]), X[j])
+                             for j in range(3))
+                  + sum(sp.diff(p * th[i], X[i]) for i in range(3)))
+    check("[3D] errata weak form: residual(1).theta - corrected integrand = divergence - (div u)(u.theta)",
+          dot(residual(u, p, f, X, t, nu), th) - weak - divergence + div(u, X) * dot(u, th))
+    # The two smooth solutions for which the weak form as printed in (12) fails (docs/01).
+    e1 = [1, 0, 0]
+    for name, (ue, pe) in {"u = 0, p = x1, f = e1": ([0, 0, 0], X[0]), "u = t e1, p = 0, f = e1": ([t, 0, 0], 0)}.items():
+        res = residual(ue, pe, e1, X, t, nu)
+        check(f"[3D] {name} solves (1), (2) exactly", sum(r ** 2 for r in res) + div(ue, X) ** 2)
+
+
 def main() -> int:
     section_A()
     section_B()
     section_C()
+    section_D()
     failed = [n for n, ok in RESULTS if not ok]
     print(f"\n{len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed")
     if failed:

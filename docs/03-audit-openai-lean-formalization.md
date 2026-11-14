@@ -8,7 +8,8 @@ produced every number below are in `audit/`, and their outputs are in `audit/res
 ## 0. Verdict in five lines
 
 1. The Lean statements `NavierStokes.Comparator.navier_stokes_breakdown_R3` / `…_periodic` are a faithful encoding of
-   Fefferman's (C) and (D), with the erratum requiring periodic pressure in (D) (Section 3, one caveat in 3.4).
+   Fefferman's (C) and (D), including Clay's own erratum that requires periodic pressure in (D). The official PDF and
+   its erratum were read on 14 November (Section 3; the erratum in 3.4).
 2. The statement file is Google DeepMind's independent encoding, unchanged in every definition and in both theorem
    statements (Section 4: the only differences are imports, namespace, attributes and docstrings).
 3. The 641 k-line proof development declares no axioms and contains no `sorry` outside the four intentional challenge
@@ -24,6 +25,7 @@ produced every number below are in `audit/`, and their outputs are in `audit/res
 
 | item | value |
 |---|---|
+| official statement | Fefferman's PDF at `claymath.org` (6 pages, SHA-256 `c1b5f27b…`, with errata), read 14 November 2026; see `01-official-problem.md` |
 | toolchain | `leanprover/lean4:v4.34.0-rc2` |
 | Mathlib | `85e3a25e006c35636f0e53b0e9296caca2685bc0` (tag `v4.34.0-rc2`) |
 | Comparator | `19e111e2141cf333c7daff0f64c5f24acc91dd2e` (tag `v4.34.0-rc2`), nanoda second kernel enabled in OpenAI's configuration |
@@ -50,7 +52,8 @@ Residual trusted base after a successful Comparator run: the Lean kernel (or nan
 
 The challenge file is reproduced in `audit/reference/openai_f9e8bc5_ComparatorChallenges_NavierStokes.lean`.
 Notation: `ℝ³ = EuclideanSpace ℝ (Fin 3)`; `v : ℝ³ → ℝ → ℝ³` is the solution velocity, `v x t` position-first;
-`↿f` is the uncurried function on `ℝ³ × ℝ`.
+`↿f` is the uncurried function on `ℝ³ × ℝ`. The Fefferman column quotes conditions that were checked against the
+official PDF on 14 November 2026 (**Cited**; see `01-official-problem.md`).
 
 ### 3.1 Statement (C)
 
@@ -109,19 +112,26 @@ equivalent to requiring it for all natural $K$.
 the official (7). It makes the theorem *stronger* (nonexistence over a larger class), and it is why the development
 contains a long "pressure recovery / weak–strong comparison" argument (Section 6).
 
-### 3.4 The one caveat: periodic pressure in (D)
+### 3.4 Periodic pressure in (D): Clay's erratum
 
 The Lean (D) requires the competitor's pressure to be 1-periodic in $x$ (`isOnePeriodic_pressure`). The Formal
-Conjectures docstring says this follows "the errata appended to the Clay problem statement". I could not read the
-Clay PDF from this sandbox to confirm the wording of that erratum. The point matters because requiring more of the
-competitor makes a nonexistence theorem *weaker*: with $u$ and $f$ periodic, taking the divergence of (1) shows that
-any smooth pressure is $p = p_{\mathrm{per}} + c(t)\cdot x + d(t)$ with $p_{\mathrm{per}}$ periodic and $c(t)$ a free
-spatially-uniform acceleration (the gradient of a harmonic function with periodic gradient is constant by Liouville's
-theorem). The literal original wording of (D) would therefore admit competitors driven by $f - c(t)$ for an arbitrary
-smooth $c$, which are not covered by the formal theorem. Under the erratum they are excluded, and the formal
-statement is exactly the corrected (D). Readers who care about (D) specifically should confirm the erratum against the
-official PDF; (C) is unaffected, since on $\mathbb R^3$ the finite-energy condition on $u$ pins the pressure down
-(and the development proves this).
+Conjectures docstring says this follows "the errata appended to the Clay problem statement". **Cited** (the official
+PDF, read 14 November 2026): its Errata section begins "The further condition $p(x + e_j, t) = p(x, t)$ should be made
+explicit in Eqn (8)." Equation (8) is the periodicity condition on the data, but the pressure is never data: in (B)
+and (D) it belongs to the solution $(p,u)$. So the erratum can only mean that the solution's pressure must be
+periodic, as (10) requires of its velocity. That is how the Formal Conjectures encoding, and hence the challenge,
+states it.
+
+The point matters because requiring more of the competitor makes a nonexistence theorem *weaker*. With $u$ and $f$
+periodic, taking the divergence of (1) shows that any smooth pressure is $p = p_{\mathrm{per}} + c(t)\cdot x + d(t)$,
+with $p_{\mathrm{per}}$ periodic and $c(t)$ a free spatially-uniform acceleration (the gradient of a harmonic function
+with periodic gradient is constant by Liouville's theorem). The uncorrected wording of (D) would therefore admit
+competitors driven by $f - c(t)$ for an arbitrary smooth $c$, which the formal theorem does not cover. The erratum
+excludes them, so the formal statement is exactly (D) as Clay corrected it. (C) is unaffected, since on $\mathbb R^3$
+the finite-energy condition on $u$ pins the pressure down (and the development proves this).
+
+Until 14 November this section could only note that the erratum's wording had not been checked: `claymath.org` was not
+reachable from the sandbox. It now has been, and it is as the Formal Conjectures docstring says.
 
 ## 4. The challenge file versus DeepMind's reference
 
@@ -193,8 +203,10 @@ and I did not read it; its correctness is exactly what the kernel check certifie
 ## 7. What I could not do, and how to do it
 
 The sandbox's network policy blocks `release.lean-lang.org` (Lean toolchains), the Mathlib cache hosts, and
-`claymath.org`, `arxiv.org`, `openai.com`. GitHub itself is reachable, so the repository and the DeepMind reference
-were fetched and hashed, but no Lean binary or Mathlib `.olean` cache could be obtained, and compiling Mathlib from
+`claymath.org`, `arxiv.org`, `openai.com`. (On 14 November `claymath.org` and `arxiv.org` were reachable from a cloud
+session, and Sections 3.4 and 8 now rest on the sources themselves; `openai.com` was not.) GitHub itself is reachable,
+so the repository and the DeepMind reference were fetched and hashed, but no Lean binary or Mathlib `.olean` cache
+could be obtained, and compiling Mathlib from
 source on four cores is not feasible in a session (a four-core GitHub runner later took 2 h 51 min; see the update of
 13 November below). To reproduce the kernel check on an ordinary machine (expect several hours and ~10 GB):
 
@@ -261,15 +273,21 @@ OpenAI's own report or on the Mathlib binary cache. What it does not settle:
 * **One run.** A second run elsewhere, for example on FASRC with nanoda, would take GitHub out of the trusted base and
   add an independent kernel.
 * **Faithfulness.** A kernel check cannot tell whether the challenge statements are (C) and (D). That is Section 3,
-  with the caveat in 3.4. Nothing here concerns (A) or (B).
+  with Clay's periodic-pressure erratum discussed in 3.4. Nothing here concerns (A) or (B).
 
 ## 8. The "lost in translation" critique, read carefully
 
-Bastounis, Circelli and Hansen (arXiv:2610.08144, 6 Oct 2026) compare the manuscript with the Lean development and
-report that the pressure-flux bound (10.19) and the argument of Lemma 8.6 are not what the Lean files
-(e.g. `NavierStokes/R3/PressureFlux.lean`) prove; they conclude that "the formalised Lean proof does not correspond to
-the NL proof", and state explicitly that they are not claiming the natural-language proof is wrong. Three
-consequences, which the press coverage has tended to blur:
+Bastounis, Circelli and Hansen (arXiv:2610.08144v1, 6 Oct 2026; **Cited**, 25 pages, read 14 November 2026) compare
+the manuscript with the Lean development at the commit audited here, `f9e8bc5`. In their Example 3.1 and Figure 3,
+the inverse estimate of Lemma 8.6, equation (8.19), is stronger than the cited Lean estimate, which "uses one
+additional input derivative to control the same torus derivatives of the output". In their Example 3.3 and Figure 4,
+for the pressure-flux bound (10.19), "Both the stated bound and the mathematical argument used to prove it differ from
+the cited Lean estimate" (in `NavierStokes/R3/PressureFlux.lean`). Their abstract concludes that "the formalised Lean
+proof does not correspond to the NL proof of blow-up of solutions to the Navier-Stokes equations". Their disclaimer:
+"We do not make claims about the correctness of OpenAI's NL proof, we only make statements about mistranslations into
+Lean." And they grant the formal side: "The Lean code merely tells us that the theorem is correct, yet the NL proof with
+intermediate arguments, lemmas and results may be incorrect or have incorrect arguments." Three consequences, which
+the press coverage has tended to blur:
 
 * **The formal theorem is unaffected.** If the challenge statement is faithful (Section 3) and the build is sound, (C)
   and (D) are theorems whatever the PDF says. The Lean development is the proof; the PDF is a commentary on it.
@@ -284,7 +302,7 @@ consequences, which the press coverage has tended to blur:
 
 | risk | status |
 |---|---|
-| challenge file does not mean what it says | audited in Section 3; one documented caveat (3.4) |
+| challenge file does not mean what it says | audited in Section 3 against the official PDF (read 14 November 2026); the formal (D) is (D) with Clay's own periodic-pressure erratum (3.4) |
 | hidden axioms / escape hatches | none found by static scan; **machine-checked** on the rebuild from source of 12–13 November by Comparator and `#print axioms`: only `propext`, `Quot.sound`, `Classical.choice` (Section 7) |
 | tampered Mathlib cache or toolchain | Mathlib rebuilt from source at the pinned commit with no binary cache; the toolchain is the official release, checked against its pinned SHA-256. GitHub's runners and Actions cache remain in the trusted base (Section 7) |
 | Lean kernel bug | open: only the Lean kernel has checked the proof here; the second kernel (nanoda, Comparator's `enable_nanoda`) was not run |
@@ -298,7 +316,7 @@ consequences, which the press coverage has tended to blur:
 
 As a formal claim, (C) and (D) are in the best evidential position any Millennium-problem claim has ever been in:
 a mechanically checked proof, rebuilt from source and re-checked by this repository on 12–13 November (Section 7), of
-an independently written statement that I have verified, line by line, is the official one (modulo the
-periodic-pressure erratum). As a piece of human mathematics, the result is not yet
-understood, not yet refereed, and not accepted by the Clay Institute. And as an answer to the question most people
+an independently written statement that I have verified, line by line, is the official one, Clay's periodic-pressure
+erratum included. As a piece of human mathematics, the result is not yet understood, not yet refereed, and not
+accepted by the Clay Institute. And as an answer to the question most people
 mean — do smooth, unforced, finite-energy Navier–Stokes flows ever blow up? — it says nothing at all.

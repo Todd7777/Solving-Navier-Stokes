@@ -3,9 +3,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --partition=sapphire
-#SBATCH --cpus-per-task=64
-#SBATCH --mem=256G
-#SBATCH --time=0-08:00
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
+#SBATCH --time=0-04:00
 #SBATCH --output=%x-%j.out
 #
 # One stage of audit/kernel-check/kernel_check.sh as a SLURM job on Harvard FASRC Cannon.
@@ -26,8 +26,9 @@
 #                    $WORK/tmp). Comparator writes the solution's export there for nanoda.
 #   USE_MATHLIB_CACHE, SANDBOX, NANODA, LEAN_NUM_THREADS, LEANCHECKER_THREADS, RESUME_CHECK:
 #                    see kernel_check.sh.
-# Optional tools are found on the PATH you submit with: cargo for the nanoda second kernel, Go for
-# landrun (which also needs Landlock, Linux >= 5.13; Cannon's compute nodes run 4.18).
+# Optional tools are found on the PATH you submit with: cargo for the nanoda second kernel
+# (`submit_fasrc.sh --nanoda` requires it), Go for landrun (which also needs Landlock, Linux >= 5.13;
+# Cannon's compute nodes run 4.18).
 set -euo pipefail
 
 stage=${1:-}
@@ -77,8 +78,8 @@ else
   mem_mb=$(awk '/^MemTotal:/{print int($2 / 1024)}' /proc/meminfo)
 fi
 export LEAN_NUM_THREADS=${LEAN_NUM_THREADS:-$cpus}
-if [ -z "${LEANCHECKER_THREADS:-}" ]; then   # budget 12 GB per parallel leanchecker replay
-  n=$((mem_mb / 12288))
+if [ -z "${LEANCHECKER_THREADS:-}" ]; then   # budget 16 GB per parallel leanchecker replay
+  n=$((mem_mb / 16384))
   [ "$n" -le "$cpus" ] || n=$cpus
   [ "$n" -ge 1 ] || n=1
   export LEANCHECKER_THREADS=$n
@@ -101,9 +102,9 @@ rev=$(git -C "$kc_dir" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 if [ -n "$(git -C "$kc_dir" status --porcelain --untracked-files=no -- . 2>/dev/null)" ]; then
   rev="$rev with local changes to audit/kernel-check"
 fi
-printf '%s start %-5s job %s on %s (partition %s): %s CPUs, %s MB, LEAN_NUM_THREADS=%s, LEANCHECKER_THREADS=%s, RESUME_CHECK=%s, repository %s\n' \
+printf '%s start %-5s job %s on %s (partition %s): %s CPUs, %s MB, LEAN_NUM_THREADS=%s, LEANCHECKER_THREADS=%s, NANODA=%s, RESUME_CHECK=%s, repository %s\n' \
   "$(date -u +%FT%TZ)" "$stage" "${SLURM_JOB_ID:-none}" "$(hostname)" "${SLURM_JOB_PARTITION:-none}" \
-  "$cpus" "$mem_mb" "$LEAN_NUM_THREADS" "$LEANCHECKER_THREADS" "${RESUME_CHECK:-0}" "$rev" | tee -a "$jobs_log"
+  "$cpus" "$mem_mb" "$LEAN_NUM_THREADS" "$LEANCHECKER_THREADS" "${NANODA:-auto}" "${RESUME_CHECK:-0}" "$rev" | tee -a "$jobs_log"
 # shellcheck disable=SC2329  # called by the EXIT trap
 finish() {
   local rc=$?

@@ -30,7 +30,7 @@ python -m pytest -q   # 2026-11-14: 30 pass
 In the cloud environment `pytest` on PATH can be a uv tool without numpy or sympy, which fails at collection;
 `python -m pytest` runs in the interpreter the requirements went into.
 
-## State on 2026-11-13
+## State on 2026-11-14
 
 - `audit/kernel-check/kernel_check.sh` rebuilds OpenAI's proof and runs the kernel checks. It is Linux-only and
   compiles Mathlib from source by default, which takes hours. A cloud session is the wrong place for it. It runs as
